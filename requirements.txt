@@ -3,7 +3,8 @@ uvicorn
 groq
 python-dotenv
 pinecone-client
-langchain-pinecone==0.1.3
+langchain-community
 langchain-huggingface
 sentence-transformers
 huggingface-hub
+pinecone==3.0.0
