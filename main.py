@@ -7,17 +7,13 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from groq import Groq
-from langchain_community.vectorstores import Pinecone as PineconeVectorStore
-from langchain_huggingface import HuggingFaceEmbeddings
+from pinecone import Pinecone
+from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
 app = FastAPI(title="Pulse Medical Assistant")
 
-# -------------------------------------------------------------------
-# CORS — lock down to your frontend domain in production
-# e.g. allow_origins=["https://your-frontend.com"]
-# -------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,7 +21,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve only the frontend folder, not the whole project directory
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
 @app.get("/")
@@ -35,12 +30,10 @@ async def read_index():
 # -------------------------------------------------------------------
 # ML / Vector DB setup (runs once at startup)
 # -------------------------------------------------------------------
-embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
-vectordb = PineconeVectorStore(
-    index_name="pulse-medical-db",
-    embedding=embed
-)
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+index = pc.Index("pulse-medical-db")
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
@@ -65,8 +58,14 @@ async def chat(request: ChatRequest):
     try:
         latest_message = request.messages[-1].content
 
-        docs = vectordb.similarity_search(latest_message, k=3)
-        context = "\n\n".join([doc.page_content for doc in docs])
+        # Embed the query and search Pinecone directly
+        query_embedding = embedder.encode(latest_message).tolist()
+        results = index.query(vector=query_embedding, top_k=3, include_metadata=True)
+
+        context = "\n\n".join([
+            match["metadata"].get("text", "")
+            for match in results["matches"]
+        ])
 
         system_prompt = f"""You are Pulse, an expert, professional medical assistant.
 Your goal is to provide accurate, evidence-based, and empathetic information.
@@ -93,7 +92,7 @@ At the end of every response that provides medical advice or information, you MU
         response = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=full_history,
-            max_tokens=1024,   # increased from 500 for fuller medical answers
+            max_tokens=1024,
             temperature=0.2,
         )
 
