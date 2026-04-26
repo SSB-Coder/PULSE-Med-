@@ -1,0 +1,97 @@
+:root {
+    --primary-color: #2563eb; /* Professional Medical Blue */
+    --bg-color: #f8fafc;
+    --text-color: #1e293b;
+    --assistant-bg: #e2e8f0;
+    --user-bg: #2563eb;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+.chat-container {
+    width: 100%;
+    max-width: 600px;
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+h1 { color: var(--primary-color); text-align: center; margin-top: 0; }
+p { text-align: center; color: #64748b; margin-bottom: 2rem; }
+
+/* The Chat Box */
+.chat-box {
+    height: 400px;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #f1f5f9;
+}
+
+/* Message Bubbles */
+.message {
+    padding: 10px 15px;
+    border-radius: 18px;
+    margin-bottom: 10px;
+    max-width: 80%;
+    line-height: 1.5;
+}
+
+.user {
+    background-color: var(--user-bg);
+    color: white;
+    margin-left: auto; /* Push to right */
+    border-bottom-right-radius: 2px;
+}
+
+.assistant {
+    background-color: var(--assistant-bg);
+    color: var(--text-color);
+    margin-right: auto; /* Push to left */
+    border-bottom-left-radius: 2px;
+}
+
+/* Input Area */
+.input-area {
+    display: flex;
+    gap: 10px;
+}
+
+input {
+    flex-grow: 1;
+    padding: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    outline: none;
+}
+
+button {
+    padding: 10px 20px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+button:hover { background-color: #1d4ed8; }
+
+.message {
+    animation: fadeIn 0.3s ease-in-out;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
