@@ -6,3 +6,4 @@ langchain-pinecone
 langchain-huggingface
 sentence-transformers
 pinecone-client
+simsimd>=4.0.0
