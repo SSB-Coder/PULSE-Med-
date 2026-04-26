@@ -3,22 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PULSE:Medical Assitant</title>
+    <title>PULSE: Medical Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-    <<div class="chat-container">
-    <h1>🩺 PULSE: Medical Assistant</h1>
-    <p>Ask me anything about medical topics, and I'll do my best to assist you!</p>
-    
-    <div id="chat-box" class="chat-box"></div>
-    
-    <div class="input-area">
-        <input type="text" id="user-input" placeholder="Type your query here...">
-        <button onclick="sendbtn()">Send</button>
+    <div class="app-wrapper">
+
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-logo">🩺 PULSE</span>
+                <button class="close-btn" onclick="toggleSidebar()" title="Close sidebar">✕</button>
+            </div>
+
+            <div class="sidebar-section">
+                <p class="sidebar-label">Session</p>
+                <button class="sidebar-action-btn reset" onclick="resetChat()">
+                    <span class="btn-icon">↺</span> Reset Conversation
+                </button>
+            </div>
+
+            <div class="sidebar-section">
+                <p class="sidebar-label">About</p>
+                <div class="sidebar-info">
+                    <p>Pulse is an AI medical assistant powered by evidence-based knowledge. Always consult a licensed physician for personal medical decisions.</p>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <span>Powered by LLaMA · Pinecone</span>
+            </div>
+        </aside>
+
+        <main class="chat-container">
+            <header class="topbar">
+                <button class="menu-btn" onclick="toggleSidebar()" title="Open menu">☰</button>
+                <div class="topbar-title">
+                    <span class="pulse-dot"></span>
+                    PULSE Medical Assistant
+                </div>
+                <div class="topbar-actions">
+                    <button class="icon-btn reset-top-btn" onclick="resetChat()" title="Reset chat">↺</button>
+                </div>
+            </header>
+
+            <div id="chat-box" class="chat-box">
+                <div class="welcome-screen" id="welcome-screen">
+                    <div class="welcome-icon">🩺</div>
+                    <h2>Welcome to PULSE</h2>
+                    <p>Your AI-powered medical information assistant. Ask me about symptoms, conditions, medications, or general health topics.</p>
+                    <div class="suggestion-chips">
+                        <button class="chip" onclick="fillInput(this)">What are symptoms of diabetes?</button>
+                        <button class="chip" onclick="fillInput(this)">How does ibuprofen work?</button>
+                        <button class="chip" onclick="fillInput(this)">What is hypertension?</button>
+                        <button class="chip" onclick="fillInput(this)">Signs of a vitamin D deficiency</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <input type="text" id="user-input" placeholder="Ask a medical question…" autocomplete="off" />
+                    <button class="send-btn" onclick="sendbtn()" title="Send">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+                <p class="input-disclaimer">AI responses are for informational purposes only. Not a substitute for professional medical advice.</p>
+            </div>
+        </main>
+
     </div>
-</div>
     <script src="app.js"></script>
 </body>
 </html>
