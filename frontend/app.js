@@ -1,8 +1,7 @@
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://simonsimply-pulse.hf.space";
 let chatHistory = [];
 let isLoading = false;
 
-// Send on Enter key
 document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('user-input');
     input.addEventListener('keydown', (e) => {
@@ -41,7 +40,6 @@ function toggleSidebar() {
     sidebar.classList.toggle('hidden');
 }
 
-// Close sidebar when clicking outside on mobile
 document.addEventListener('click', (e) => {
     const sidebar = document.getElementById('sidebar');
     const menuBtn = document.querySelector('.menu-btn');
@@ -59,16 +57,13 @@ async function sendbtn() {
     const userMessage = input.value.trim();
     if (!userMessage) return;
 
-    // Remove welcome screen if present
     const welcome = document.getElementById('welcome-screen');
     if (welcome) welcome.remove();
 
-    // Append user message
     appendMessage('user', userMessage, chatBox);
     chatHistory.push({ role: 'user', content: userMessage });
     input.value = '';
 
-    // Show typing indicator
     const typingId = showTyping(chatBox);
     isLoading = true;
     setSendState(true);
@@ -81,7 +76,7 @@ async function sendbtn() {
         });
 
         const data = await response.json();
-        const botReply = data.reply || 'Error: No response from server.';
+        const botReply = data.reply || data.detail || 'Error: No response from server.';
 
         removeTyping(typingId, chatBox);
         appendMessage('assistant', botReply, chatBox);
