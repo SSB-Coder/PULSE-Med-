@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 groq
+langchain-pinecone
+langchain-core
 python-dotenv
-pinecone
-pandas
-tqdm
+pydantic
