@@ -8,10 +8,12 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from groq import Groq
 from langchain_pinecone import PineconeVectorStore, PineconeEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
+
 
 load_dotenv()
 
-app = FastAPI(title="Pulse Medical Assistant")
+app = FastAPI(title="Pulse Medical Assistant", redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,8 +27,8 @@ app.mount("/static", StaticFiles(directory="frontend"), name="static")
 @app.get("/")
 async def read_index():
     return FileResponse("frontend/index.html")
-
-embed = PineconeEmbeddings(model="llama-text-embed-v2", api_key=os.getenv("PINECONE_API_KEY"))
+    
+embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 vectordb = PineconeVectorStore(index_name="pulse-medical-db", embedding=embed)
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
