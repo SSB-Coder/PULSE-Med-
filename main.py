@@ -7,8 +7,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from groq import Groq
-from pinecone import Pinecone
-from sentence_transformers import SentenceTransformer
+from langchain_pinecone import PineconeVectorStore, PineconeEmbeddings
 
 load_dotenv()
 
@@ -27,19 +26,11 @@ app.mount("/static", StaticFiles(directory="frontend"), name="static")
 async def read_index():
     return FileResponse("frontend/index.html")
 
-# -------------------------------------------------------------------
-# ML / Vector DB setup (runs once at startup)
-# -------------------------------------------------------------------
-embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-
-pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-index = pc.Index("pulse-medical-db")
+embed = PineconeEmbeddings(model="llama-text-embed-v2", api_key=os.getenv("PINECONE_API_KEY"))
+vectordb = PineconeVectorStore(index_name="pulse-medical-db", embedding=embed)
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# -------------------------------------------------------------------
-# Models
-# -------------------------------------------------------------------
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -47,9 +38,6 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
 
-# -------------------------------------------------------------------
-# Routes
-# -------------------------------------------------------------------
 @app.post("/chat")
 async def chat(request: ChatRequest):
     if not request.messages:
@@ -58,14 +46,8 @@ async def chat(request: ChatRequest):
     try:
         latest_message = request.messages[-1].content
 
-        # Embed the query and search Pinecone directly
-        query_embedding = embedder.encode(latest_message).tolist()
-        results = index.query(vector=query_embedding, top_k=3, include_metadata=True)
-
-        context = "\n\n".join([
-            match["metadata"].get("text", "")
-            for match in results["matches"]
-        ])
+        docs = vectordb.similarity_search(latest_message, k=3)
+        context = "\n\n".join([doc.page_content for doc in docs])
 
         system_prompt = f"""You are Pulse, an expert, professional medical assistant.
 Your goal is to provide accurate, evidence-based, and empathetic information.
@@ -106,5 +88,5 @@ At the end of every response that provides medical advice or information, you MU
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("PORT", 7860))
     uvicorn.run(app, host="0.0.0.0", port=port)
