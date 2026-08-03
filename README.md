@@ -1,17 +1,17 @@
 <div align="center">
 
-# 🩺 PULSE Med
+# 🩺 PULSE
 
 ### AI-Powered Medical Information Assistant
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-pulse--med.vercel.app-blue?style=for-the-badge&logo=vercel)](https://pulse-med.vercel.app/)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![LLaMA](https://img.shields.io/badge/LLaMA%203.3%2070B-Groq-F55036?style=for-the-badge)](https://groq.com/)
-[![Pinecone](https://img.shields.io/badge/Pinecone-Vector%20DB-00BFA5?style=for-the-badge)](https://www.pinecone.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+*Evidence-based medical Q&A, grounded by retrieval — not model guesswork.*
 
-*Evidence-based medical Q&A powered by RAG — not hallucination.*
+[![Frontend](https://img.shields.io/badge/Frontend-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://pulse-med.vercel.app/)
+[![Backend](https://img.shields.io/badge/Backend-Hugging%20Face%20Spaces-FFD21E?style=for-the-badge)](https://simonsimply-pulse.hf.space)
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Groq](https://img.shields.io/badge/Groq-LLaMA%203.3%2070B-F55036?style=for-the-badge)](https://groq.com/)
+[![Pinecone](https://img.shields.io/badge/Pinecone-Vector%20DB-00BFA5?style=for-the-badge)](https://www.pinecone.io/)
 
 </div>
 
@@ -22,27 +22,32 @@
 - [Overview](#-overview)
 - [Live Demo](#-live-demo)
 - [Features](#-features)
-- [Architecture](#-architecture)
+- [How It Works](#-how-it-works)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
 - [Getting Started](#-getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
   - [Environment Variables](#environment-variables)
+  - [Populating the Knowledge Base](#populating-the-knowledge-base)
   - [Running Locally](#running-locally)
-- [Docker](#-docker)
+- [Running with Docker](#-running-with-docker)
 - [Deployment](#-deployment)
+  - [Backend → Hugging Face Spaces](#backend--hugging-face-spaces)
+  - [Frontend → Vercel](#frontend--vercel)
 - [API Reference](#-api-reference)
-- [Safety & Disclaimer](#️-safety--disclaimer)
+- [Safety Design](#-safety-design)
+- [Known Limitations & Notes](#-known-limitations--notes)
 - [Contributing](#-contributing)
+- [License](#-license)
 
 ---
 
 ## 🔍 Overview
 
-**PULSE** is a Retrieval-Augmented Generation (RAG) medical chatbot that answers health and medical questions using a curated, evidence-based knowledge base. Rather than relying on a language model's potentially outdated or hallucinated training data, PULSE first retrieves the most relevant medical context from a Pinecone vector database before generating a response — ensuring answers are grounded, accurate, and traceable.
+**PULSE** is a Retrieval-Augmented Generation (RAG) medical chatbot. Instead of answering purely from a language model's parametric memory, every query is first used to retrieve the most relevant passages from a Pinecone vector index, and the model is instructed to answer *only* from that retrieved context. That grounding is what keeps answers traceable and reduces confident-sounding fabrication.
 
-Built with a FastAPI backend and a clean vanilla JavaScript frontend, PULSE is designed to be a responsible AI health companion: it always cites its scope, redirects off-topic questions, and appends a safety disclaimer to every piece of medical advice.
+The backend is a small FastAPI service that handles embedding, retrieval, prompt construction, and the call to the LLM. The frontend is a dependency-free HTML/CSS/JS chat interface — no build step, no framework.
 
 > ⚠️ **PULSE is for informational and educational purposes only.** It is not a substitute for professional medical advice, diagnosis, or treatment. Always consult a licensed healthcare professional.
 
@@ -50,98 +55,101 @@ Built with a FastAPI backend and a clean vanilla JavaScript frontend, PULSE is d
 
 ## 🌐 Live Demo
 
-Try PULSE right now — no setup required:
+| Component | URL |
+|---|---|
+| **Chat UI** (Vercel) | [pulse-med.vercel.app](https://pulse-med.vercel.app/) |
+| **API base** (Hugging Face Spaces) | [simonsimply-pulse.hf.space](https://simonsimply-pulse.hf.space) |
 
-**[https://pulse-med.vercel.app/](https://pulse-med.vercel.app/)**
-
-Example questions to get started:
+Try one of these to get started:
 - *"What are the symptoms of diabetes?"*
 - *"How does ibuprofen work?"*
 - *"What is hypertension?"*
-- *"Signs of a vitamin D deficiency?"*
+- *"Signs of a vitamin D deficiency"*
 
 ---
 
 ## ✨ Features
 
-**🧠 Retrieval-Augmented Generation (RAG)**
-Answers are grounded in retrieved medical documents from a Pinecone vector store — not the model's raw parametric memory — dramatically reducing hallucinations.
+**🧠 Retrieval-Augmented Generation**
+Every answer is grounded in the top-3 most similar chunks pulled from a Pinecone index, not the model's raw training data.
 
-**💬 Multi-turn Conversation**
-Maintains full chat history in each request, enabling coherent, context-aware follow-up questions across a conversation session.
+**💬 Multi-Turn Conversation**
+The full message history is kept client-side and re-sent with each request, so follow-up questions stay coherent.
 
-**🛡️ Hallucination Prevention**
-If the answer cannot be found in the retrieved context, PULSE explicitly states it cannot find the information rather than guessing or fabricating a response.
+**🛡️ Hallucination Guardrail**
+If nothing relevant turns up in the retrieved context, the system prompt instructs the model to say so explicitly rather than guess.
 
-**🚨 Safety-First Design**
-Critically urgent queries trigger an immediate recommendation to seek emergency medical care. Every medical response is capped with a mandatory disclaimer.
+**🚑 Emergency Escalation**
+Queries that read as critically urgent are met with an immediate recommendation to seek emergency care.
 
 **🔒 Scope Enforcement**
-Non-medical questions are politely redirected back to health topics, keeping the assistant focused and trustworthy.
+Non-medical questions are redirected back to health topics at the prompt level.
 
-**⚡ Fast Inference via Groq**
-Uses Groq's LPU inference engine with LLaMA 3.3 70B Versatile for near-instant, high-quality responses.
+**⚠️ Mandatory Disclaimer**
+Every response containing medical information is required (by the system prompt) to end with a standardized AI-not-a-doctor disclaimer.
 
-**📱 Clean, Responsive UI**
-A lightweight vanilla HTML/CSS/JS frontend with suggested starter questions, a reset button, and mobile-friendly layout — no framework required.
+**⚡ Fast Inference**
+Generation runs on Groq's LPU inference engine with Llama 3.3 70B Versatile.
 
-**🐳 Docker & Cloud Ready**
-Ships with a `Dockerfile` and a `render.yaml` for one-command containerization and seamless deployment to Render. Frontend deploys to Vercel.
+**📱 Framework-Free UI**
+A single HTML/CSS/JS bundle with a collapsible sidebar, starter-question chips, a typing indicator, and Markdown-rendered assistant replies (via `marked.js`).
 
----
-
-## 🏗️ Architecture
-
-```
-User (Browser)
-     │
-     │  HTTP POST /chat  { messages: [...] }
-     ▼
-┌─────────────────────────────────────┐
-│         FastAPI Backend             │
-│                                     │
-│  1. Extract latest user message     │
-│  2. Embed query via HuggingFace     │
-│     (all-MiniLM-L6-v2)              │
-│  3. Similarity search Pinecone      │
-│     vector store  (top k=3 docs)    │
-│  4. Inject retrieved context into   │
-│     system prompt                   │
-│  5. Send full chat history +        │
-│     context to Groq API             │
-│     (LLaMA 3.3 70B Versatile)       │
-│  6. Return AI reply to client       │
-└─────────────────────────────────────┘
-     │
-     ▼
-  Response: { "reply": "..." }
-```
-
-### RAG Flow in Detail
-
-1. **Query Embedding** — The user's latest message is converted into a dense vector using `sentence-transformers/all-MiniLM-L6-v2` via LangChain HuggingFace.
-2. **Semantic Retrieval** — The vector is used to query the `pulse-medical-db` Pinecone index, returning the 3 most semantically relevant medical document chunks.
-3. **Context Injection** — Retrieved chunks are concatenated and injected into a structured system prompt that instructs the model to answer *only* from the provided context.
-4. **LLM Generation** — The full conversation history (system prompt + all prior turns + new user message) is sent to Groq's API, which runs LLaMA 3.3 70B Versatile at `temperature=0.2` for deterministic, factual responses.
-5. **Response** — The assistant's reply is returned as JSON and rendered in the chat UI.
+**🐳 Container-First**
+Ships with a `Dockerfile` that pre-caches the embedding model at build time for faster cold starts — ready to deploy anywhere that runs containers.
 
 ---
 
-## 🛠️ Tech Stack
+## 🔧 How It Works
+
+```
+Browser (Vercel-hosted frontend)
+        │
+        │   POST /chat   { messages: [...history] }
+        ▼
+┌──────────────────────────────────────────────┐
+│     FastAPI backend (Hugging Face Spaces)     │
+│                                                │
+│  1. Take the latest user message              │
+│  2. Embed it → all-MiniLM-L6-v2 (local)       │
+│  3. Similarity search Pinecone index          │
+│     "pulse-medical-db"          (top k = 3)   │
+│  4. Concatenate the 3 chunks into `context`   │
+│  5. Inject `context` into the system prompt   │
+│  6. Send [system prompt + full history]       │
+│     to Groq → llama-3.3-70b-versatile         │
+│     (temperature = 0.2, max_tokens = 1024)    │
+│  7. Return the model's reply as JSON          │
+└──────────────────────────────────────────────┘
+        │
+        ▼
+   { "reply": "..." }
+```
+
+1. **Query embedding** — the newest user message is embedded with `sentence-transformers/all-MiniLM-L6-v2`, run locally via `langchain-huggingface` (no external embedding API call).
+2. **Semantic retrieval** — that vector is used to search the `pulse-medical-db` Pinecone index for the 3 most similar chunks, via `langchain-pinecone`.
+3. **Context injection** — the retrieved chunks are concatenated and dropped into a system prompt that enforces context-first answering, explicit "I don't know" behavior, safety escalation, scope limits, and the disclaimer requirement (see [Safety Design](#-safety-design)).
+4. **Generation** — the system prompt plus the entire conversation history is sent to Groq's `llama-3.3-70b-versatile` at low temperature for more deterministic, factual output.
+5. **Response** — the reply is returned as `{"reply": "..."}` and rendered client-side as Markdown.
+
+---
+
+## 🧰 Tech Stack
 
 | Layer | Technology |
 |---|---|
-| **Backend Framework** | [FastAPI](https://fastapi.tiangolo.com/) + [Uvicorn](https://www.uvicorn.org/) |
-| **LLM** | [LLaMA 3.3 70B Versatile](https://groq.com/) via Groq API |
-| **Vector Database** | [Pinecone](https://www.pinecone.io/) |
-| **Embeddings** | [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) |
-| **LLM Orchestration** | [LangChain](https://www.langchain.com/) (`langchain-pinecone`, `langchain-huggingface`) |
-| **Data Validation** | [Pydantic](https://docs.pydantic.dev/) |
-| **Frontend** | Vanilla HTML5, CSS3, JavaScript |
-| **Containerization** | Docker |
-| **Backend Hosting** | [Render](https://render.com/) |
-| **Frontend Hosting** | [Vercel](https://vercel.com/) |
-| **Language** | Python 3.11+ |
+| Backend framework | [FastAPI](https://fastapi.tiangolo.com/) + [Uvicorn](https://www.uvicorn.org/) |
+| LLM inference | [Groq API](https://groq.com/) — Llama 3.3 70B Versatile |
+| Vector database | [Pinecone](https://www.pinecone.io/) (index: `pulse-medical-db`) |
+| Embedding model | [`sentence-transformers/all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) via `langchain-huggingface` |
+| RAG orchestration | [LangChain](https://www.langchain.com/) (`langchain-pinecone`, `langchain-huggingface`, `langchain-core`) |
+| Request validation | [Pydantic](https://docs.pydantic.dev/) |
+| Frontend | Vanilla HTML5 / CSS3 / JavaScript — no framework, no build step |
+| Markdown rendering | [marked.js](https://marked.js.org/) (via CDN) |
+| Fonts | DM Serif Display + DM Sans (Google Fonts) |
+| Containerization | Docker (`python:3.11-slim`) |
+| Backend hosting | Hugging Face Spaces (Docker SDK) |
+| Frontend hosting | Vercel |
+| Language runtime | Python 3.11 |
 
 ---
 
@@ -149,23 +157,20 @@ User (Browser)
 
 ```
 PULSE-Med-/
-├── frontend/               # Static frontend assets
-│   ├── index.html          # Main chat interface
-│   ├── *.css               # Styling
-│   └── *.js                # Chat logic & API calls
-│
-├── main.py                 # FastAPI application entry point
-│                           #   - /        → serves index.html
-│                           #   - /chat    → RAG + LLM endpoint
-│                           #   - /static  → mounts frontend/
-│
+├── .gitignore
+├── .python-version        # pyenv pin (3.11.3) — a leftover from local/Render-era tooling
+├── Dockerfile              # Builds the image; the real source of truth for the Python version now
+├── README.md
 ├── requirements.txt        # Python dependencies
-├── Dockerfile              # Container build instructions
-├── render.yaml             # Render deployment configuration
-├── runtime.txt             # Python runtime version for Render
-├── .python-version         # Python version pin (pyenv)
-└── .gitignore
+├── runtime.txt              # Render-style runtime pin (3.11.0) — unused by the current Docker deploy
+├── main.py                  # FastAPI app: routes, RAG pipeline, Groq call
+└── frontend/
+    ├── index.html              # Chat UI shell
+    ├── style.css                # Design tokens, layout, responsive rules
+    └── app.js                    # Chat state, API calls, Markdown rendering
 ```
+
+> `runtime.txt` and `.python-version` predate the move to a Docker-based deploy (see [Known Limitations & Notes](#-known-limitations--notes)) and no longer affect how the app is built or run — the `Dockerfile`'s `FROM python:3.11-slim` is what actually pins the interpreter today.
 
 ---
 
@@ -174,9 +179,9 @@ PULSE-Med-/
 ### Prerequisites
 
 - Python **3.11+**
-- A **Groq API key** — [get one free at console.groq.com](https://console.groq.com)
-- A **Pinecone API key** and a pre-populated index named `pulse-medical-db` — [sign up at pinecone.io](https://www.pinecone.io/)
-- `git` and `pip`
+- A **Groq API key** — [console.groq.com](https://console.groq.com)
+- A **Pinecone API key**, plus an existing index named `pulse-medical-db` populated with embedded medical reference text (see [Populating the Knowledge Base](#populating-the-knowledge-base) — this isn't something `pip install` gets you)
+- `git`
 
 ### Installation
 
@@ -198,15 +203,32 @@ pip install -r requirements.txt
 Create a `.env` file in the project root:
 
 ```env
-# .env
 GROQ_API_KEY=your_groq_api_key_here
 PINECONE_API_KEY=your_pinecone_api_key_here
 
-# Optional: override the default port (default: 7860)
+# Optional — defaults to 7860
 PORT=7860
 ```
 
-> ⚠️ Never commit your `.env` file. It's already included in `.gitignore`.
+| Variable | Required | Default | Notes |
+|---|---|---|---|
+| `GROQ_API_KEY` | Yes | — | Read explicitly via `os.getenv()` in `main.py` |
+| `PINECONE_API_KEY` | Yes | — | Not referenced directly in `main.py` — picked up implicitly by the Pinecone client from the environment, but still required |
+| `PORT` | No | `7860` | Port Uvicorn binds to |
+
+`.env` is already covered by `.gitignore` — never commit real keys. Also note that the embedding model, Pinecone client, and Groq client are all initialized at **module load time** in `main.py`, not per-request — so a missing or invalid key tends to surface as a startup failure or an error on the very first request, rather than a graceful per-call check.
+
+### Populating the Knowledge Base
+
+`main.py` expects a Pinecone index literally named `pulse-medical-db` (hardcoded, not env-configurable) that's already populated with embedded medical reference text. The ingestion script and source datasets originally used to build that index — `ingest_data.py`, `medic.csv`, `convo.csv` — are excluded via `.gitignore` and aren't part of this repository.
+
+To run PULSE with meaningful answers, you'll need to:
+1. Create a Pinecone index named `pulse-medical-db` (or update the `index_name` in `main.py` to match your own).
+2. Chunk your own medical source documents.
+3. Embed each chunk with the same model used at query time (`sentence-transformers/all-MiniLM-L6-v2`) so query and document vectors live in the same space.
+4. Upsert the resulting vectors into the index.
+
+Without this step, `/chat` will still respond, but with little or no relevant context to draw from.
 
 ### Running Locally
 
@@ -214,17 +236,22 @@ PORT=7860
 # Start the FastAPI server
 python main.py
 
-# Or with uvicorn directly
+# ...or with uvicorn directly, with auto-reload
 uvicorn main:app --host 0.0.0.0 --port 7860 --reload
 ```
 
-Then open your browser at **[http://localhost:7860](http://localhost:7860)**.
+The server itself serves the chat UI at `http://localhost:7860`. If you're working on the frontend specifically, it's more reliable to serve the `frontend/` folder on its own:
+
+```bash
+cd frontend
+python -m http.server 5500
+```
+
+Then open `http://localhost:5500`. This matches how the production Vercel deployment serves the same three files, and sidesteps a static-path quirk in the backend's self-hosted UI — see [Known Limitations & Notes](#-known-limitations--notes).
 
 ---
 
-## 🐳 Docker
-
-Build and run PULSE in a container:
+## 🐳 Running with Docker
 
 ```bash
 # Build the image
@@ -237,31 +264,30 @@ docker run -p 7860:7860 \
   pulse-med
 ```
 
-Visit **[http://localhost:7860](http://localhost:7860)** — the app serves both the API and the frontend from a single container.
+The `Dockerfile` pre-downloads and caches the `all-MiniLM-L6-v2` embedding model at build time (see the `RUN python -c "..."` step), so the container doesn't need to fetch it on every cold start. Visit `http://localhost:7860` once it's running.
 
 ---
 
-## ☁️ Deployment
+## 📦 Deployment
 
-### Backend — Render
+### Backend → Hugging Face Spaces
 
-The `render.yaml` at the root of the repo configures automatic deployment to [Render](https://render.com/). To deploy:
+This repo's backend is deployed as a **Docker SDK Space** on Hugging Face:
 
-1. Fork this repository.
-2. Connect your fork to Render via the dashboard.
-3. Set the `GROQ_API_KEY` and `PINECONE_API_KEY` environment variables in Render's settings.
-4. Render will automatically detect `render.yaml` and deploy.
+1. Create a new Space at [huggingface.co/new-space](https://huggingface.co/new-space) and choose **Docker** as the Space SDK.
+2. Push this repository's contents to the Space (Spaces are git repos — add the Space as a remote and push, or connect it via GitHub).
+3. In the Space's **Settings → Variables and secrets**, add `GROQ_API_KEY` and `PINECONE_API_KEY` as secrets.
+4. Hugging Face builds the image straight from the `Dockerfile`. Since it already exposes port `7860` — the port Spaces' Docker SDK expects — no extra configuration is needed.
+5. The Space becomes reachable at `https://<your-username>-<space-name>.hf.space`. This project's production backend lives at `https://simonsimply-pulse.hf.space`, which is the exact URL hardcoded as `API_URL` in `frontend/app.js`.
 
-### Frontend — Vercel
+### Frontend → Vercel
 
-The frontend (`/frontend`) is deployed as a static site on Vercel. To deploy your own:
+1. Import this repository into [Vercel](https://vercel.com/).
+2. Set the **Root Directory** to `frontend`. It's a static site — no build command or framework preset required.
+3. If you're pointing at your own backend, update the `API_URL` constant at the top of `frontend/app.js` to your Hugging Face Space URL **before** deploying.
+4. Deploy. Vercel serves `index.html`, `style.css`, and `app.js` as siblings with normal relative-path resolution, so the asset-path quirk described below doesn't apply here.
 
-1. Import the repository into [Vercel](https://vercel.com/).
-2. Set the **Root Directory** to `frontend`.
-3. Update the API base URL in the frontend JS to point at your Render backend.
-4. Deploy.
-
-> **Note:** The production deployment at `pulse-med.vercel.app` serves the frontend from Vercel while the `/chat` API calls hit the Render-hosted backend.
+Because the two are on different domains, the browser makes cross-origin requests from Vercel to Hugging Face Spaces. The backend already sets `allow_origins=["*"]`, so no additional CORS setup is needed on either side.
 
 ---
 
@@ -269,9 +295,9 @@ The frontend (`/frontend`) is deployed as a static site on Vercel. To deploy you
 
 ### `POST /chat`
 
-Send a conversation to the PULSE assistant and receive a medical response grounded in the RAG knowledge base.
+Send a conversation to PULSE and get back a response grounded in the RAG knowledge base.
 
-**Request Body**
+**Request**
 
 ```json
 {
@@ -283,50 +309,66 @@ Send a conversation to the PULSE assistant and receive a medical response ground
 
 | Field | Type | Description |
 |---|---|---|
-| `messages` | `array` | Full conversation history. Each item has a `role` (`"user"` or `"assistant"`) and `content` (string). |
+| `messages` | `array` | Full conversation history. Each item has `role` (`"user"` or `"assistant"`) and `content` (string). |
 
 **Response**
 
 ```json
 {
-  "reply": "Diabetes presents with several key symptoms, including...\n\n⚠️ Disclaimer: I am an AI, not a doctor..."
+  "reply": "Diabetes commonly presents with...\n\n⚠️ Disclaimer: I am an AI, not a doctor..."
 }
 ```
 
-**Error Responses**
+**Errors**
 
 | Status | Meaning |
 |---|---|
-| `400` | No messages provided in the request body |
-| `500` | Internal server error (e.g., upstream API failure) |
+| `400` | `messages` was empty |
+| `500` | Internal error (e.g. Groq or Pinecone call failed) |
+
+Both error responses come back as `{"detail": "..."}` (standard FastAPI/`HTTPException` shape). The frontend actually surfaces that `detail` text directly in the chat window when `reply` is missing, so a `400`/`500` shows up as an assistant-style message rather than failing silently — see the fallback in `app.js`.
+
+> Note: the app is created with `redirect_slashes=False`, so call `/chat` exactly — a trailing-slash `/chat/` request will not be redirected.
 
 ### `GET /`
 
-Returns the main `index.html` chat interface.
+Returns `frontend/index.html`.
 
 ### `GET /static/*`
 
-Serves static frontend assets (CSS, JS, images) from the `frontend/` directory.
+Serves the contents of `frontend/` (e.g. `/static/style.css`, `/static/app.js`).
 
 ---
 
-## ⚠️ Safety & Disclaimer
+## 🩺 Safety Design
 
-PULSE is built with patient safety as a first-class concern. The following guardrails are enforced at the system-prompt level on every request:
+The system prompt in `main.py` enforces the same guardrails on every single request:
 
-- **Context-First:** Responses are generated only from retrieved medical documents. The model will not speculate beyond the provided context.
-- **Explicit Uncertainty:** If the knowledge base does not contain relevant information, PULSE explicitly says so rather than fabricating an answer.
-- **Emergency Escalation:** Queries that appear critically urgent prompt an immediate recommendation to seek emergency medical care.
-- **Mandatory Disclaimer:** Every response that provides medical information ends with a standardized disclaimer reminding the user that PULSE is an AI, not a licensed physician.
-- **Scope Limitation:** Questions outside the medical domain are politely redirected.
+- **Context-first** — answer only from the retrieved context; don't fall back on general training knowledge unless the context genuinely can't answer the question.
+- **Explicit uncertainty** — if the answer isn't in the retrieved context, say so directly instead of guessing.
+- **Emergency escalation** — critically urgent queries get an immediate nudge toward emergency care.
+- **Scope limitation** — non-medical questions are redirected back to health topics.
+- **Mandatory disclaimer** — every medical response must end with:
+  > "⚠️ Disclaimer: I am an AI, not a doctor. This information is for educational purposes and should not replace professional medical advice. Please consult a healthcare professional for personalized guidance."
 
-**PULSE does not store, log, or transmit personal health data entered by users.**
+These are prompt-level instructions to the LLM, not hard code-level filters — they shape behavior but aren't a guaranteed enforcement mechanism.
+
+---
+
+## 🧩 Known Limitations & Notes
+
+A few things worth knowing if you're extending or redeploying this project:
+
+- **Open CORS, no auth, no rate limiting** — `allow_origins=["*"]` and `/chat` has no API key or throttling of its own. Fine for a personal demo; worth locking down before wider public exposure, both to control Groq/Pinecone usage costs and to prevent abuse.
+- **No server-side chat storage** — conversation history lives only in the browser's `chatHistory` JS array. A page refresh or hitting "Reset" clears it permanently.
+- **Hardcoded index name** — `pulse-medical-db` is set directly in `main.py` rather than read from an environment variable, so switching indexes means editing code.
+- **Ingestion pipeline isn't included** — `ingest_data.py`, `medic.csv`, and `convo.csv` are all `.gitignore`d, meaning the process that built the original knowledge base isn't part of this repo (see [Populating the Knowledge Base](#populating-the-knowledge-base)).
+- **`runtime.txt` / `.python-version` are vestigial** — both predate the current Docker-based deployment (git history shows a `render.yaml` was added and later removed) and have no effect on the app as it's built and run today.
+- **Backend's self-served UI has a static-path mismatch** — `index.html` links `style.css`/`app.js` with relative paths, which resolve to `/style.css` and `/app.js` when served from the backend's `/` route. But only `/static/style.css` and `/static/app.js` are actually mounted, so those two asset requests 404 (verified directly). Visiting the Hugging Face Space URL in a browser loads the HTML but not its styling or script. This doesn't affect the production setup, since Vercel serves the three frontend files correctly on its own — it just means the backend isn't a fully working standalone UI host as-is.
 
 ---
 
 ## 🤝 Contributing
-
-Contributions are welcome! Here's how to get involved:
 
 1. **Fork** the repository.
 2. **Create** a feature branch: `git checkout -b feature/your-feature-name`
@@ -334,19 +376,19 @@ Contributions are welcome! Here's how to get involved:
 4. **Push** to your branch: `git push origin feature/your-feature-name`
 5. **Open** a Pull Request against `main`.
 
-Please ensure your code follows existing style conventions and that any new dependencies are added to `requirements.txt`.
+Please keep new dependencies added to `requirements.txt` and follow the existing code style.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
+No `LICENSE` file is currently included in this repository, so all rights are reserved by default — the code is publicly visible but not formally open-source yet. If you want to explicitly grant reuse rights, consider adding a `LICENSE` file (MIT is a common, permissive choice for projects like this).
 
 ---
 
 <div align="center">
 
-Built with ❤️ by [SSB-Coder](https://github.com/SSB-Coder)
+Built by [SSB-Coder](https://github.com/SSB-Coder)
 
 *PULSE is for informational purposes only — always consult a licensed healthcare professional for medical decisions.*
 
