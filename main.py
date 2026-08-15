@@ -74,7 +74,7 @@ At the end of every response that provides medical advice or information, you MU
             full_history.append({"role": msg.role, "content": msg.content})
 
         response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=full_history,
             max_tokens=1024,
             temperature=0.2,
