@@ -138,7 +138,7 @@ Browser (Vercel-hosted frontend)
 | Layer | Technology |
 |---|---|
 | Backend framework | [FastAPI](https://fastapi.tiangolo.com/) + [Uvicorn](https://www.uvicorn.org/) |
-| LLM inference | [Groq API](https://groq.com/) — Llama 3.3 70B Versatile |
+| LLM inference | [Groq API](https://groq.com/) — GPT-OSS 120B |
 | Vector database | [Pinecone](https://www.pinecone.io/) (index: `pulse-medical-db`) |
 | Embedding model | [`sentence-transformers/all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) via `langchain-huggingface` |
 | RAG orchestration | [LangChain](https://www.langchain.com/) (`langchain-pinecone`, `langchain-huggingface`, `langchain-core`) |
