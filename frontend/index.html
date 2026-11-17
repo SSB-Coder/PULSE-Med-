@@ -11,8 +11,8 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
-<body>
-    <div class="app-wrapper">
+<body class="auth-gated">
+    <div class="app-wrapper" id="app-shell" hidden>
 
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
@@ -33,7 +33,7 @@
                 <button id="login-btn" class="sidebar-action-btn" type="button">Log in / Create account</button>
                 <button id="history-btn" class="sidebar-action-btn" type="button" hidden>Medical history</button>
                 <label id="history-toggle-label" class="small-text" hidden>
-                    <input id="use-history" type="checkbox"> Use saved history in chat (shares it with Groq)
+                    <input id="use-history" type="checkbox"> Use saved history for replies and doctor matches (shares it with Groq)
                 </label>
                 <button id="logout-btn" class="sidebar-action-btn" type="button" hidden>Sign out</button>
                 <button id="doctors-btn" class="sidebar-action-btn" type="button">Explore demo doctors</button>
@@ -58,6 +58,7 @@
                     PULSE Medical Assistant
                 </div>
                 <div class="topbar-actions">
+                    <span id="session-badge" class="session-badge">Guest session</span>
                     <button class="icon-btn reset-top-btn" onclick="resetChat()" title="Reset chat">↺</button>
                 </div>
             </header>
@@ -66,7 +67,7 @@
                 <div class="welcome-screen" id="welcome-screen">
                     <div class="welcome-icon">🩺</div>
                     <h2>Welcome to PULSE</h2>
-                    <p>Your AI-powered medical information assistant. Ask me about symptoms, conditions, medications, or general health topics.</p>
+                    <p>Tell us what is bothering you today. PULSE can explain health topics and suggest fictional doctor profiles based on your symptoms and the history you choose to share.</p>
                     <div class="suggestion-chips">
                         <button class="chip" onclick="fillInput(this)">What are symptoms of diabetes?</button>
                         <button class="chip" onclick="fillInput(this)">How does ibuprofen work?</button>
@@ -77,8 +78,9 @@
             </div>
 
             <div class="input-area">
+                <p id="chat-context" class="chat-context">Guest mode · Doctor matches use what you share in this conversation.</p>
                 <div class="input-wrapper">
-                    <input type="text" id="user-input" placeholder="Ask a medical question…" autocomplete="off" />
+                    <input type="text" id="user-input" placeholder="Describe your symptoms or ask a health question…" autocomplete="off" />
                     <button class="send-btn" onclick="sendbtn()" title="Send">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -92,9 +94,23 @@
 
     </div>
     <dialog id="auth-dialog" aria-labelledby="auth-title">
+        <div class="auth-layout">
+        <section class="auth-intro" aria-label="About PULSE">
+            <a class="auth-brand" href="./">🩺 PULSE</a>
+            <p class="auth-eyebrow">YOUR HEALTH, IN CONTEXT</p>
+            <h1>A clearer starting point for your health.</h1>
+            <p>Talk through your symptoms, keep your medical history together, and explore doctors whose listed interests match your concerns.</p>
+            <div class="auth-benefits">
+                <p><strong>01 · Tell your story</strong><br>Type your history or add a photo of a written report.</p>
+                <p><strong>02 · Understand your concerns</strong><br>Ask questions with the context you choose to share.</p>
+                <p><strong>03 · Explore a next step</strong><br>Discover relevant profiles in our fictional doctor directory.</p>
+            </div>
+            <small>Educational information. For urgent medical concerns, seek local emergency care.</small>
+        </section>
+        <section class="auth-panel">
         <div class="dialog-heading">
             <h2 id="auth-title">Log in to PULSE</h2>
-            <button type="button" data-close="auth-dialog" aria-label="Close login">✕</button>
+            <button type="button" id="auth-close-btn" data-close="auth-dialog" aria-label="Close login">✕</button>
         </div>
         <p id="auth-description" class="small-text">Use your email and password to access your saved medical history.</p>
         <form id="auth-form">
@@ -115,6 +131,13 @@
             <button id="signup-mode-btn" type="button">Create account</button>
             <button id="forgot-mode-btn" type="button">Forgot password?</button>
         </div>
+        <div id="guest-entry" class="guest-entry">
+            <span>or explore first</span>
+            <button id="guest-btn" type="button">Continue as guest <span aria-hidden="true">→</span></button>
+            <p class="small-text">Chat and explore demo doctors without an account. Log in to save medical history.</p>
+        </div>
+        </section>
+        </div>
     </dialog>
     <dialog id="history-dialog" aria-labelledby="history-title">
         <div class="dialog-heading">
@@ -122,7 +145,7 @@
             <button type="button" data-close="history-dialog" aria-label="Close medical history">✕</button>
         </div>
         <p class="small-text">Optional, user-reported information. Skip any field. You can edit or delete this later.
-            Saving stores text in your Supabase account. Enable “Use saved history in chat” to share it with Groq for replies.</p>
+            Saving stores text in your Supabase account. Enable the saved-history option in the sidebar to share it with Groq for replies and doctor suggestions.</p>
         <form id="history-form">
             <div class="history-grid">
                 <label>Conditions<textarea name="conditions" maxlength="3000" placeholder="e.g. asthma, diagnosed in 2020"></textarea></label>

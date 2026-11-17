@@ -15,7 +15,39 @@ let authMode = 'login';
 let authRequestEpoch = 0;
 let authBusy = false;
 let recoveringPassword = false;
+let guestMode = false;
+let entryScreen = true;
 const $ = (id) => document.getElementById(id);
+
+function updateChatContext() {
+    const useHistory = Boolean(session && $('use-history').checked);
+    $('session-badge').textContent = session ? 'Signed in' : 'Guest session';
+    $('chat-context').textContent = useHistory
+        ? 'History enabled · Replies and demo doctor matches use your saved history and current symptoms.'
+        : session ? 'History off · Doctor matches use this conversation. Enable saved history in the sidebar to include it.'
+        : 'Guest mode · Doctor matches use what you share in this conversation.';
+}
+
+function setEntryScreen(visible) {
+    entryScreen = visible;
+    $('app-shell').hidden = visible;
+    document.body.classList.toggle('auth-gated', visible);
+    $('auth-close-btn').hidden = visible;
+    $('guest-entry').hidden = !visible;
+    if (visible) {
+        setAuthMode('login');
+        showDialog('auth-dialog');
+    }
+}
+
+function continueAsGuest() {
+    if (authBusy || recoveringPassword) return;
+    guestMode = true;
+    setEntryScreen(false);
+    $('auth-dialog').close();
+    updateChatContext();
+    $('user-input').focus();
+}
 
 async function api(path, options = {}) {
     const headers = new Headers(options.headers || {});
@@ -67,6 +99,11 @@ function applySession(nextSession) {
     const previousId = session?.user.id;
     session = nextSession;
     const signedIn = Boolean(session);
+    if (signedIn) {
+        guestMode = false;
+        setEntryScreen(false);
+        if (!recoveringPassword) $('auth-dialog').close();
+    } else if (!guestMode) setEntryScreen(true);
     $('login-btn').hidden = signedIn;
     $('logout-btn').hidden = !signedIn;
     $('history-btn').hidden = !signedIn;
@@ -78,7 +115,7 @@ function applySession(nextSession) {
         clearPasswords();
         if (!signedIn) {
             recoveringPassword = false;
-            $('auth-dialog').close();
+            if (guestMode) $('auth-dialog').close();
         }
         $('history-form').inert = false;
         $('use-history').checked = false;
@@ -87,6 +124,7 @@ function applySession(nextSession) {
         resetChat();
         if (signedIn && !recoveringPassword) void loadHistory(true);
     }
+    updateChatContext();
 }
 
 function authRedirect(recovery = false) {
@@ -102,7 +140,7 @@ function clearPasswords() {
 
 function setAuthBusy(busy) {
     authBusy = busy;
-    ['auth-email', 'auth-password', 'auth-confirm', 'auth-submit', 'login-mode-btn', 'signup-mode-btn', 'forgot-mode-btn']
+    ['auth-email', 'auth-password', 'auth-confirm', 'auth-submit', 'guest-btn', 'login-mode-btn', 'signup-mode-btn', 'forgot-mode-btn']
         .forEach((id) => { $(id).disabled = busy; });
 }
 
@@ -157,6 +195,8 @@ async function initializeAuth() {
     if (!config.SUPABASE_URL || !config.SUPABASE_PUBLISHABLE_KEY || !window.supabase) {
         $('account-status').textContent = 'Account setup pending. General chat and demo doctors are available.';
         $('login-btn').disabled = true;
+        $('auth-submit').disabled = true;
+        $('auth-status').textContent = 'Account setup is unavailable. You can continue as a guest.';
         return;
     }
     const recoveryRedirect = new URL(window.location.href).searchParams.get('auth') === 'recovery';
@@ -265,6 +305,7 @@ function closeAuthDialog() {
 
 async function logout() {
     if (!authClient) return;
+    guestMode = false;
     const { error } = await authClient.auth.signOut({ scope: 'local' });
     if (error) { $('account-status').textContent = 'Could not sign out. Please try again.'; return; }
     applySession(null);
@@ -281,7 +322,7 @@ async function saveHistory(event) {
         if (epoch !== accountEpoch) return;
         clearExtraction();
         resetChat();
-        $('history-status').textContent = 'History saved. Chat was reset to use your updated details. Enable “Use saved history in chat” if you want to share it with the assistant.';
+        $('history-status').textContent = 'History saved. Enable the saved-history option in the sidebar to use it for replies and doctor suggestions. Your conversation has been reset.';
     } catch (error) {
         if (epoch === accountEpoch) $('history-status').textContent = error.message;
     } finally { $('save-history-btn').disabled = false; }
@@ -383,11 +424,12 @@ function resetChat() {
     chatHistory = [];
     isLoading = false;
     setSendState(false);
+    updateChatContext();
     $('chat-box').innerHTML = `<div class="welcome-screen" id="welcome-screen">
         <div class="welcome-icon">🩺</div><h2>Welcome to PULSE</h2>
-        <p>Ask about health topics, optionally use your saved history, or explore fictional doctor profiles.</p>
+        <p>Tell us your current symptoms and how long they have lasted. PULSE will explain what it can and show matching fictional doctor profiles. You choose whether to include saved medical history.</p>
         <div class="suggestion-chips">
-        <button class="chip" onclick="fillInput(this)">What are symptoms of diabetes?</button>
+        <button class="chip" onclick="fillInput(this)">I have recurring headaches. Who could I consult?</button>
         <button class="chip" onclick="fillInput(this)">Find a doctor for migraines</button>
         </div></div>`;
 }
@@ -418,7 +460,15 @@ async function sendbtn() {
         chatHistory.push({ role: 'assistant', content: data.reply });
         if (data.doctors?.length) {
             const cards = document.createElement('div'); cards.className = 'doctor-results';
-            cards.append(...data.doctors.map(doctorCard)); $('chat-box').appendChild(cards);
+            const heading = document.createElement('h3');
+            heading.className = 'doctor-results-title';
+            heading.textContent = 'Doctor profiles to explore';
+            const basis = document.createElement('p');
+            basis.className = 'small-text';
+            basis.textContent = data.used_history
+                ? 'Matched against this conversation and your shared history. Fictional profiles; no appointments.'
+                : 'Matched against this conversation. Fictional profiles; no appointments.';
+            cards.append(heading, basis, ...data.doctors.map(doctorCard)); $('chat-box').appendChild(cards);
         }
     } catch (error) {
         if (epoch !== chatEpoch) return;
@@ -446,6 +496,14 @@ function setSendState(loading) { const btn = document.querySelector('.send-btn')
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    setEntryScreen(true);
+    $('guest-btn').addEventListener('click', continueAsGuest);
+    $('auth-dialog').addEventListener('cancel', (event) => {
+        if (entryScreen) event.preventDefault();
+    });
+    $('auth-dialog').addEventListener('close', () => {
+        if (entryScreen) showDialog('auth-dialog');
+    });
     $('login-btn').addEventListener('click', login);
     $('auth-form').addEventListener('submit', submitAuth);
     $('login-mode-btn').addEventListener('click', () => setAuthMode('login'));
@@ -473,7 +531,10 @@ document.addEventListener('DOMContentLoaded', () => {
     $('use-history').addEventListener('change', resetChat);
     $('user-input').addEventListener('input', () => $('user-input').setCustomValidity(''));
     $('user-input').addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendbtn(); } });
-    void initializeAuth().catch(() => { $('account-status').textContent = 'Could not initialize sign-in. General chat remains available.'; });
+    void initializeAuth().catch(() => {
+        $('account-status').textContent = 'Could not initialize sign-in. General chat remains available.';
+        $('auth-status').textContent = 'Could not connect to sign-in. Try reloading, or continue as a guest.';
+    });
 });
 document.addEventListener('click', (event) => {
     if (window.innerWidth <= 700 && !$('sidebar').classList.contains('hidden') && !$('sidebar').contains(event.target) && !event.target.closest('.menu-btn') && !event.target.closest('dialog')) $('sidebar').classList.add('hidden');

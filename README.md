@@ -22,6 +22,7 @@ cloud accounts, database migration, credentials, and deployment still require se
 ## Features
 
 - **Reference-based chat:** retrieve medical passages from the existing Pinecone index.
+- **Account entry:** a full-page login/create-account screen with a Continue as guest option. Existing sessions open the app directly; signing out returns to login.
 - **Email/password login:** registration, login, email confirmation, and password reset through
   Supabase Auth. Supabase stores salted bcrypt hashes; PULSE never persists raw passwords.
 - **Personal history:** conditions, medications, allergies, surgeries, family history, and notes.
@@ -31,7 +32,7 @@ cloud accounts, database migration, credentials, and deployment still require se
 - **Optional document photo transcription:** camera/file input → Groq vision model → editable
   text preview → add reviewed text to notes → explicit save. PULSE does not persist original images.
 - **Fictional doctors:** 20 JSON profiles, including resume text, with topic, city, specialty,
-  and fee filters. Chat receives matching profiles and can explain their listed interests.
+  and fee filters. Chat proactively matches current symptoms, earlier user messages, and saved history when explicitly enabled. Current-message matches take priority, and cards explain which context matched. Matching is based on catalog keywords; the model explains the supplied profiles.
   These invented profiles cannot be booked and are not clinical referrals.
 - **Safer chat rendering:** sanitize assistant Markdown; clear chat when accounts, history,
   or history-sharing preferences change.

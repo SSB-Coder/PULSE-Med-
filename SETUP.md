@@ -122,8 +122,10 @@ window.PULSE_CONFIG = Object.freeze({
 Use the same Supabase project in the backend and frontend. This file is served publicly.
 User passwords, SMTP credentials, the Groq key, and the Pinecone key must never be placed here.
 
-Until Supabase is configured, the sign-in button explains that setup is pending. General
-chat still uses your existing Groq/Pinecone backend, and the doctor directory works without login.
+The first screen offers email/password login, account creation, and **Continue as guest**.
+Until Supabase is configured, use the guest option. General chat still uses your existing
+Groq/Pinecone backend, and the doctor directory works without login. Existing sessions enter
+the app directly. Signing out returns to the account screen.
 
 ## 4. Configure the Hugging Face backend
 
@@ -188,10 +190,10 @@ PDF and HEIC ingestion are not included.
    then log in. A user with no saved profile should see the optional history form.
    A manually created/confirmed test account can log in immediately.
 5. Save a test profile using invented data, refresh, and confirm it persists.
-6. Enable **Use saved history in chat** to share that history with Groq for personalization.
+6. Enable **Use saved history for replies and doctor matches** in the sidebar to share that history with Groq for personalization. The chat footer shows whether history is enabled.
    Changing that toggle resets the current conversation so previously sent history isn't
    silently reused after opting out. Editing/deleting history and switching accounts reset chat too.
-7. Try the fictional directory filters and a chat request such as “Find a doctor for migraines”.
+7. Try the fictional directory filters, then describe a current symptom such as “I have a headache”. Chat should proactively show relevant profiles without requiring a doctor request. With consented history, matching includes that context and prioritizes the current message. Follow-up details can use symptoms from earlier user turns; assistant messages do not supply patient history.
    Matches come from `data/doctors.json`; they cannot be booked and are not clinical referrals.
 8. If enabled, test photo extraction with a **synthetic** written report. Confirm that
    extraction alone does not save history, then review and save the text explicitly.

@@ -22,7 +22,7 @@ function setup() {
     const calls = [];
     const context = vm.createContext({
         window: { PULSE_CONFIG: { API_URL: 'https://api.example' }, location: { origin: 'https://app.example', pathname: '/', href: 'https://app.example/' }, history: { replaceState() {} } },
-        document: { getElementById: get, createElement: element, querySelector: () => get('send-btn'), addEventListener() {} },
+        document: { body: element(), getElementById: get, createElement: element, querySelector: () => get('send-btn'), addEventListener() {} },
         Headers, FormData, URLSearchParams, URL, Blob, setTimeout,
         fetch: async (url, options) => { calls.push({ url, options }); return { status: 200, ok: true, json: async () => ({}) }; }
     });
@@ -254,4 +254,38 @@ test('closing login clears passwords and ignores its delayed form response', asy
     assert.equal(get('auth-confirm').value, '');
     assert.equal(run('authBusy'), false);
     assert.equal(get('auth-status').textContent.includes('Could not log in'), false);
+});
+
+test('entry screen requires login or an explicit guest choice, including when auth is unavailable', async () => {
+    const { get, run } = setup();
+    run('setEntryScreen(true)');
+    await run('initializeAuth()');
+    assert.equal(get('app-shell').hidden, true);
+    assert.equal(get('auth-dialog').open, true);
+    assert.equal(get('auth-close-btn').hidden, true);
+    assert.equal(get('auth-submit').disabled, true);
+    run('continueAsGuest()');
+    assert.equal(get('app-shell').hidden, false);
+    assert.equal(get('auth-dialog').open, false);
+    assert.equal(run('session'), null);
+    assert.match(get('chat-context').textContent, /Guest mode/);
+    // A delayed empty session event must not send a guest back to login.
+    run('applySession(null)');
+    assert.equal(get('app-shell').hidden, false);
+});
+
+test('restored session enters the app and sign-out returns to login with consent reset', () => {
+    const { get, run } = setup();
+    run('setEntryScreen(true)');
+    run("applySession({access_token:'token', user:{id:'account', email:'test@example.com'}})");
+    assert.equal(get('app-shell').hidden, false);
+    assert.equal(get('auth-dialog').open, false);
+    get('use-history').checked = true;
+    run('resetChat()');
+    assert.match(get('chat-context').textContent, /History enabled/);
+    run('applySession(null)');
+    assert.equal(get('app-shell').hidden, true);
+    assert.equal(get('auth-dialog').open, true);
+    assert.equal(get('use-history').checked, false);
+    assert.equal(run('chatHistory.length'), 0);
 });

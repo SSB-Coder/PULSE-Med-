@@ -7,6 +7,7 @@
     --slate-800:  #1e293b;
     --slate-700:  #334155;
     --slate-500:  #64748b;
+    --slate-400:  #94a3b8;
     --slate-300:  #cbd5e1;
     --slate-200:  #e2e8f0;
     --slate-100:  #f1f5f9;
@@ -514,3 +515,47 @@ dialog textarea { resize: vertical; min-height: 70px; }
 
 .account-section .sidebar-action-btn { margin: 6px 0; background: rgba(255,255,255,.07); color: var(--slate-200); }
 .account-section .sidebar-action-btn:hover { background: rgba(255,255,255,.13); }
+
+/* Full-page account entry; the same form remains available from a guest session. */
+.auth-gated { background: var(--slate-50); }
+.auth-gated #auth-dialog {
+    position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh;
+    max-height: 100dvh; margin: 0; border: 0; border-radius: 0; padding: 0;
+    box-shadow: none; background: var(--slate-50);
+}
+.auth-layout { width: 100%; }
+.auth-intro { display: none; }
+.auth-gated .auth-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(360px, 1fr); min-height: 100%; }
+.auth-gated .auth-intro {
+    display: flex; flex-direction: column; justify-content: center; gap: 25px;
+    padding: clamp(32px, 6vw, 96px); color: var(--slate-100);
+    background: radial-gradient(ellipse at top left, #244d69, var(--slate-900) 75%);
+}
+.auth-brand { color: white; text-decoration: none; font-size: 1.6rem; font-weight: 600; letter-spacing: .05em; }
+.auth-eyebrow { color: #a9d8df; letter-spacing: .16em; font-size: .73rem; margin-top: 24px; }
+.auth-intro h1 { font-family: var(--font-display); font-size: clamp(2.5rem, 4vw, 4.4rem); font-weight: 400; line-height: 1.08; max-width: 570px; }
+.auth-intro > p:not(.auth-eyebrow) { line-height: 1.8; color: var(--slate-300); max-width: 510px; }
+.auth-benefits { display: grid; gap: 18px; font-size: .86rem; line-height: 1.7; color: var(--slate-300); }
+.auth-benefits strong { color: white; font-weight: 500; }
+.auth-intro small { color: var(--slate-400); line-height: 1.6; max-width: 430px; }
+.auth-gated .auth-panel { align-self: center; width: min(100%, 500px); justify-self: center; padding: 48px 40px; }
+.auth-panel #auth-submit { width: 100%; padding: 13px; margin-top: 8px; }
+.auth-panel .dialog-actions { justify-content: space-between; }
+.auth-panel .dialog-actions button { border: 0; background: transparent; color: var(--blue-700); padding: 8px 0; }
+.auth-gated .auth-panel input { background: var(--white); padding: 13px; }
+.guest-entry { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--slate-200); text-align: center; }
+.guest-entry > span { display: block; color: var(--slate-500); font-size: .8rem; margin-bottom: 14px; }
+#guest-btn { width: 100%; padding: 13px; display: flex; justify-content: space-between; align-items: center; }
+.guest-entry p { margin-top: 12px; }
+.chat-context { color: var(--slate-500); font-size: .76rem; line-height: 1.5; margin-bottom: 10px; }
+.session-badge { color: var(--slate-500); font-size: .75rem; white-space: nowrap; }
+.doctor-results-title { font-family: var(--font-display); font-size: 1.3rem; font-weight: 400; }
+@media (max-width: 760px) {
+    .auth-gated .auth-layout { grid-template-columns: 1fr; }
+    .auth-gated .auth-intro { padding: 28px 24px; gap: 14px; }
+    .auth-intro h1 { font-size: 2.3rem; }
+    .auth-eyebrow { margin-top: 4px; }
+    .auth-benefits, .auth-intro small { display: none; }
+    .auth-gated .auth-panel { padding: 28px 24px 40px; }
+    .session-badge { display: none; }
+}

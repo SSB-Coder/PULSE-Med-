@@ -177,3 +177,47 @@ def test_frontend_assets_and_cors(client):
     assert response.headers["access-control-allow-origin"] == "https://pulse-med.vercel.app"
     denied = client.options("/profile", headers={"Origin": "https://untrusted.example", "Access-Control-Request-Method": "PUT"})
     assert "access-control-allow-origin" not in denied.headers
+
+
+def test_doctor_matching_prioritizes_current_symptoms_over_history():
+    from doctors import recommend_doctors
+    matches = recommend_doctors("I have a headache", history={"conditions": "hypertension blood pressure heart"})
+    assert matches[0]["specialty"] == "Neurology"
+    assert "current message" in matches[0]["match_reason"]
+    assert any("shared history" in doctor["match_reason"] for doctor in matches)
+    assert all(doctor["fictional"] and "keywords" not in doctor for doctor in matches)
+    assert recommend_doctors("no headache and no migraines") == []
+
+
+def test_chat_proactively_matches_symptoms_and_only_consented_history(client, monkeypatch):
+    profile = Mock(return_value={"history": {"conditions": "hypertension"}})
+    monkeypatch.setattr(services, "get_profile", profile)
+    store = Mock()
+    store.similarity_search.return_value = []
+    monkeypatch.setattr(services, "get_vector_store", lambda: store)
+    groq = Mock()
+    groq.chat.completions.create.return_value = fake_completion()
+    monkeypatch.setattr(services, "get_groq", lambda: groq)
+    payload = {"messages": [{"role": "user", "content": "I have a headache"}]}
+    response = client.post('/chat', headers=HEADERS, json=payload)
+    assert response.status_code == 200
+    assert response.json()["doctors"][0]["specialty"] == "Neurology"
+    assert not response.json()["used_history"]
+    profile.assert_not_called()
+    assert "hypertension" not in groq.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    payload["use_history"] = True
+    response = client.post('/chat', headers=HEADERS, json=payload)
+    assert response.json()["used_history"]
+    assert response.json()["doctors"][0]["specialty"] == "Neurology"
+    assert any("shared history" in doctor["match_reason"] for doctor in response.json()["doctors"])
+    profile.assert_called_once_with(USER_A, "user-a-token")
+    # Follow-up timing details retain symptom context from the user, not the assistant.
+    payload = {"messages": [
+        {"role": "user", "content": "I have a headache"},
+        {"role": "assistant", "content": "Hypertension and skin rash are examples."},
+        {"role": "user", "content": "It started yesterday"},
+    ]}
+    response = client.post('/chat', json=payload)
+    assert response.json()["doctors"][0]["specialty"] == "Neurology"
+    assert all(d["specialty"] not in ("Cardiology", "Dermatology") for d in response.json()["doctors"])
+    assert "Earlier in this conversation" in response.json()["doctors"][0]["match_reason"]
