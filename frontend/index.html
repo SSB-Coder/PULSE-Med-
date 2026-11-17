@@ -7,7 +7,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
     <div class="app-wrapper">
@@ -25,6 +27,17 @@
                 </button>
             </div>
 
+            <div class="sidebar-section account-section">
+                <p class="sidebar-label">Your account</p>
+                <p id="account-status" class="small-text" role="status">Checking sign-in configuration…</p>
+                <button id="login-btn" class="sidebar-action-btn" type="button">Log in / Create account</button>
+                <button id="history-btn" class="sidebar-action-btn" type="button" hidden>Medical history</button>
+                <label id="history-toggle-label" class="small-text" hidden>
+                    <input id="use-history" type="checkbox"> Use saved history in chat (shares it with Groq)
+                </label>
+                <button id="logout-btn" class="sidebar-action-btn" type="button" hidden>Sign out</button>
+                <button id="doctors-btn" class="sidebar-action-btn" type="button">Explore demo doctors</button>
+            </div>
             <div class="sidebar-section">
                 <p class="sidebar-label">About</p>
                 <div class="sidebar-info">
@@ -33,7 +46,7 @@
             </div>
 
             <div class="sidebar-footer">
-                <span>Powered by LLaMA · Pinecone</span>
+                <span>GPT-OSS · Pinecone · Supabase</span>
             </div>
         </aside>
 
@@ -78,6 +91,94 @@
         </main>
 
     </div>
+    <dialog id="auth-dialog" aria-labelledby="auth-title">
+        <div class="dialog-heading">
+            <h2 id="auth-title">Log in to PULSE</h2>
+            <button type="button" data-close="auth-dialog" aria-label="Close login">✕</button>
+        </div>
+        <p id="auth-description" class="small-text">Use your email and password to access your saved medical history.</p>
+        <form id="auth-form">
+            <label id="auth-email-label">Email address
+                <input id="auth-email" type="email" autocomplete="username" maxlength="254" required>
+            </label>
+            <label id="auth-password-label">Password
+                <input id="auth-password" type="password" autocomplete="current-password" required>
+            </label>
+            <label id="auth-confirm-label" hidden>Confirm password
+                <input id="auth-confirm" type="password" autocomplete="new-password">
+            </label>
+            <p id="auth-status" class="form-status" role="status" aria-live="polite"></p>
+            <button id="auth-submit" type="submit" class="primary-button">Log in</button>
+        </form>
+        <div id="auth-mode-links" class="dialog-actions">
+            <button id="login-mode-btn" type="button">Log in</button>
+            <button id="signup-mode-btn" type="button">Create account</button>
+            <button id="forgot-mode-btn" type="button">Forgot password?</button>
+        </div>
+    </dialog>
+    <dialog id="history-dialog" aria-labelledby="history-title">
+        <div class="dialog-heading">
+            <h2 id="history-title">Your medical history</h2>
+            <button type="button" data-close="history-dialog" aria-label="Close medical history">✕</button>
+        </div>
+        <p class="small-text">Optional, user-reported information. Skip any field. You can edit or delete this later.
+            Saving stores text in your Supabase account. Enable “Use saved history in chat” to share it with Groq for replies.</p>
+        <form id="history-form">
+            <div class="history-grid">
+                <label>Conditions<textarea name="conditions" maxlength="3000" placeholder="e.g. asthma, diagnosed in 2020"></textarea></label>
+                <label>Current medications<textarea name="medications" maxlength="3000" placeholder="Names, doses, and frequency if known"></textarea></label>
+                <label>Allergies<textarea name="allergies" maxlength="2000" placeholder="Medication, food, or other allergies"></textarea></label>
+                <label>Surgeries / hospital stays<textarea name="surgeries" maxlength="2000"></textarea></label>
+                <label class="full-width">Relevant family history<textarea name="family_history" maxlength="2000"></textarea></label>
+            </div>
+            <label>Additional notes / reviewed document text<textarea name="notes" maxlength="12000" rows="5"></textarea></label>
+            <section class="photo-section" aria-labelledby="photo-title">
+                <h3 id="photo-title">Add history from a photo</h3>
+                <p class="small-text">Photograph a written report or prescription. JPEG, PNG, or WebP, up to 5 MB.
+                    This extracts writing; it does not interpret medical scans or diagnose from pictures.
+                    PULSE does not save the original photo.</p>
+                <label>Upload a document photo<input id="history-photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
+                <label>Or take a photo<input id="history-camera" type="file" accept="image/*" capture="environment"></label>
+                <label class="consent-line"><input id="photo-consent" type="checkbox"> I agree to send this photo to Groq for AI text extraction.</label>
+                <button id="extract-btn" type="button">Extract text for review</button>
+                <div id="extraction-review" hidden>
+                    <label>Check the extracted text carefully<textarea id="extracted-text" rows="7" maxlength="12000"></textarea></label>
+                    <p class="small-text">Correct names, dates, medication doses, units, and anything marked [unclear].
+                        Nothing is saved until you add the reviewed text and select Save history.</p>
+                    <button id="add-extracted-btn" type="button">Add reviewed text to notes</button>
+                </div>
+            </section>
+            <p id="history-status" class="form-status" role="status" aria-live="polite"></p>
+            <div class="dialog-actions">
+                <button id="delete-history-btn" type="button" class="danger-button">Delete saved history</button>
+                <button type="button" data-close="history-dialog">Skip / close</button>
+                <button id="save-history-btn" type="submit" class="primary-button">Save history</button>
+            </div>
+            <div id="delete-confirm" hidden>
+                <p>Delete your saved medical-history form? Your login account will remain.</p>
+                <button id="confirm-delete-btn" type="button" class="danger-button">Yes, delete history</button>
+                <button id="cancel-delete-btn" type="button">Cancel</button>
+            </div>
+        </form>
+    </dialog>
+    <dialog id="doctors-dialog" aria-labelledby="doctors-title">
+        <div class="dialog-heading">
+            <h2 id="doctors-title">Fictional doctor directory</h2>
+            <button type="button" data-close="doctors-dialog" aria-label="Close doctor directory">✕</button>
+        </div>
+        <p class="small-text">All profiles, qualifications, fees, and schedules are invented demo data.
+            Matches reflect listed interests, not verified suitability. No appointments can be booked.</p>
+        <form id="doctor-filters" class="doctor-filters">
+            <label>Topic or specialty<input name="query" maxlength="2000" placeholder="e.g. migraine or dermatology"></label>
+            <label>City<select name="city"><option value="">All cities</option></select></label>
+            <label>Specialty<select name="specialty"><option value="">All specialties</option></select></label>
+            <label>Maximum fee (₹)<input name="max_fee" type="number" min="0" max="100000" placeholder="Any fee"></label>
+            <button type="submit" class="primary-button">Find matches</button>
+        </form>
+        <p id="doctors-status" role="status" aria-live="polite"></p>
+        <div id="doctor-results" class="doctor-results"></div>
+    </dialog>
+    <script src="config.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

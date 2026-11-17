@@ -7,7 +7,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 RUN python -c "from langchain_huggingface import HuggingFaceEmbeddings; HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')"
 
-COPY main.py .
+COPY main.py schemas.py services.py doctors.py ./
+COPY data/ data/
 COPY frontend/ frontend/
 
 EXPOSE 7860

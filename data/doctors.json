@@ -1,0 +1,464 @@
+[
+  {
+    "id": "demo-01",
+    "name": "Dr. Aarav Mehta",
+    "fictional": true,
+    "specialty": "General medicine",
+    "city": "Pune",
+    "experience_years": 9,
+    "qualifications": "MBBS, MD (General Medicine)",
+    "fee_inr": 650,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 9 years of simulated experience in general medicine, with listed interests in fatigue, primary care, general physician. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "general medicine",
+      "fever",
+      "fatigue",
+      "primary care",
+      "general physician"
+    ]
+  },
+  {
+    "id": "demo-02",
+    "name": "Dr. Isha Rao",
+    "fictional": true,
+    "specialty": "Neurology",
+    "city": "Pune",
+    "experience_years": 12,
+    "qualifications": "MBBS, MD, DM (Neurology)",
+    "fee_inr": 1200,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 12 years of simulated experience in neurology, with listed interests in migraines, headache, headaches. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "neurology",
+      "neurologist",
+      "migraine",
+      "migraines",
+      "headache",
+      "headaches"
+    ]
+  },
+  {
+    "id": "demo-03",
+    "name": "Dr. Kabir Shah",
+    "fictional": true,
+    "specialty": "Cardiology",
+    "city": "Mumbai",
+    "experience_years": 14,
+    "qualifications": "MBBS, MD, DM (Cardiology)",
+    "fee_inr": 1400,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 14 years of simulated experience in cardiology, with listed interests in hypertension, blood pressure, heart. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "cardiology",
+      "cardiologist",
+      "hypertension",
+      "blood pressure",
+      "heart"
+    ]
+  },
+  {
+    "id": "demo-04",
+    "name": "Dr. Mira Sen",
+    "fictional": true,
+    "specialty": "Dermatology",
+    "city": "Pune",
+    "experience_years": 8,
+    "qualifications": "MBBS, MD (Dermatology)",
+    "fee_inr": 800,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 8 years of simulated experience in dermatology, with listed interests in acne, eczema, rash. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "dermatology",
+      "dermatologist",
+      "skin",
+      "acne",
+      "eczema",
+      "rash"
+    ]
+  },
+  {
+    "id": "demo-05",
+    "name": "Dr. Rohan Iyer",
+    "fictional": true,
+    "specialty": "Endocrinology",
+    "city": "Bengaluru",
+    "experience_years": 11,
+    "qualifications": "MBBS, MD, DM (Endocrinology)",
+    "fee_inr": 1100,
+    "languages": [
+      "English",
+      "Kannada"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 11 years of simulated experience in endocrinology, with listed interests in diabetes, thyroid, endocrinologist. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "endocrinology",
+      "diabetes",
+      "thyroid",
+      "endocrinologist"
+    ]
+  },
+  {
+    "id": "demo-06",
+    "name": "Dr. Tara Kapoor",
+    "fictional": true,
+    "specialty": "Orthopaedics",
+    "city": "Delhi",
+    "experience_years": 10,
+    "qualifications": "MBBS, MS (Orthopaedics)",
+    "fee_inr": 1000,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 10 years of simulated experience in orthopaedics, with listed interests in joint, knee, back pain. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "orthopaedics",
+      "orthopedic",
+      "joint",
+      "knee",
+      "back pain"
+    ]
+  },
+  {
+    "id": "demo-07",
+    "name": "Dr. Dev Nair",
+    "fictional": true,
+    "specialty": "Pulmonology",
+    "city": "Chennai",
+    "experience_years": 13,
+    "qualifications": "MBBS, MD (Respiratory Medicine)",
+    "fee_inr": 950,
+    "languages": [
+      "English",
+      "Tamil"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 13 years of simulated experience in pulmonology, with listed interests in asthma, cough, pulmonologist. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "pulmonology",
+      "asthma",
+      "cough",
+      "pulmonologist"
+    ]
+  },
+  {
+    "id": "demo-08",
+    "name": "Dr. Anaya Bose",
+    "fictional": true,
+    "specialty": "Psychiatry",
+    "city": "Kolkata",
+    "experience_years": 9,
+    "qualifications": "MBBS, MD (Psychiatry)",
+    "fee_inr": 1000,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 9 years of simulated experience in psychiatry, with listed interests in anxiety, depression, mental health. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "psychiatry",
+      "psychiatrist",
+      "anxiety",
+      "depression",
+      "mental health"
+    ]
+  },
+  {
+    "id": "demo-09",
+    "name": "Dr. Neil Desai",
+    "fictional": true,
+    "specialty": "Gastroenterology",
+    "city": "Mumbai",
+    "experience_years": 15,
+    "qualifications": "MBBS, MD, DM (Gastroenterology)",
+    "fee_inr": 1300,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 15 years of simulated experience in gastroenterology, with listed interests in reflux, digestion, stomach. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "gastroenterology",
+      "gastroenterologist",
+      "reflux",
+      "digestion",
+      "stomach"
+    ]
+  },
+  {
+    "id": "demo-10",
+    "name": "Dr. Sana Joshi",
+    "fictional": true,
+    "specialty": "Gynaecology",
+    "city": "Pune",
+    "experience_years": 12,
+    "qualifications": "MBBS, MS (Obstetrics and Gynaecology)",
+    "fee_inr": 900,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 12 years of simulated experience in gynaecology, with listed interests in periods, menstrual, pcos. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "gynaecology",
+      "gynecology",
+      "periods",
+      "menstrual",
+      "pcos"
+    ]
+  },
+  {
+    "id": "demo-11",
+    "name": "Dr. Arjun Das",
+    "fictional": true,
+    "specialty": "General medicine",
+    "city": "Bengaluru",
+    "experience_years": 7,
+    "qualifications": "MBBS, MD (General Medicine)",
+    "fee_inr": 500,
+    "languages": [
+      "English",
+      "Kannada"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 7 years of simulated experience in general medicine, with listed interests in fatigue, primary care, general physician. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "general medicine",
+      "fever",
+      "fatigue",
+      "primary care",
+      "general physician"
+    ]
+  },
+  {
+    "id": "demo-12",
+    "name": "Dr. Leela Menon",
+    "fictional": true,
+    "specialty": "Neurology",
+    "city": "Delhi",
+    "experience_years": 16,
+    "qualifications": "MBBS, MD, DM (Neurology)",
+    "fee_inr": 1500,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 16 years of simulated experience in neurology, with listed interests in migraines, headache, headaches. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "neurology",
+      "neurologist",
+      "migraine",
+      "migraines",
+      "headache",
+      "headaches"
+    ]
+  },
+  {
+    "id": "demo-13",
+    "name": "Dr. Vihaan Sethi",
+    "fictional": true,
+    "specialty": "Cardiology",
+    "city": "Pune",
+    "experience_years": 10,
+    "qualifications": "MBBS, MD, DM (Cardiology)",
+    "fee_inr": 1100,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 10 years of simulated experience in cardiology, with listed interests in hypertension, blood pressure, heart. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "cardiology",
+      "cardiologist",
+      "hypertension",
+      "blood pressure",
+      "heart"
+    ]
+  },
+  {
+    "id": "demo-14",
+    "name": "Dr. Nisha Kulkarni",
+    "fictional": true,
+    "specialty": "Dermatology",
+    "city": "Mumbai",
+    "experience_years": 6,
+    "qualifications": "MBBS, MD (Dermatology)",
+    "fee_inr": 700,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 6 years of simulated experience in dermatology, with listed interests in acne, eczema, rash. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "dermatology",
+      "dermatologist",
+      "skin",
+      "acne",
+      "eczema",
+      "rash"
+    ]
+  },
+  {
+    "id": "demo-15",
+    "name": "Dr. Aditya Roy",
+    "fictional": true,
+    "specialty": "Endocrinology",
+    "city": "Pune",
+    "experience_years": 8,
+    "qualifications": "MBBS, MD, DM (Endocrinology)",
+    "fee_inr": 950,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 8 years of simulated experience in endocrinology, with listed interests in diabetes, thyroid, endocrinologist. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "endocrinology",
+      "diabetes",
+      "thyroid",
+      "endocrinologist"
+    ]
+  },
+  {
+    "id": "demo-16",
+    "name": "Dr. Priya Anand",
+    "fictional": true,
+    "specialty": "Paediatrics",
+    "city": "Chennai",
+    "experience_years": 11,
+    "qualifications": "MBBS, MD (Paediatrics)",
+    "fee_inr": 750,
+    "languages": [
+      "English",
+      "Tamil"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 11 years of simulated experience in paediatrics, with listed interests in children, paediatrician, pediatrician. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "paediatrics",
+      "pediatrics",
+      "child",
+      "children",
+      "paediatrician",
+      "pediatrician"
+    ]
+  },
+  {
+    "id": "demo-17",
+    "name": "Dr. Kunal Bhat",
+    "fictional": true,
+    "specialty": "Ophthalmology",
+    "city": "Bengaluru",
+    "experience_years": 9,
+    "qualifications": "MBBS, MS (Ophthalmology)",
+    "fee_inr": 850,
+    "languages": [
+      "English",
+      "Kannada"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 9 years of simulated experience in ophthalmology, with listed interests in eye, eyes, vision. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "ophthalmology",
+      "ophthalmologist",
+      "eye",
+      "eyes",
+      "vision"
+    ]
+  },
+  {
+    "id": "demo-18",
+    "name": "Dr. Riya Malhotra",
+    "fictional": true,
+    "specialty": "ENT",
+    "city": "Delhi",
+    "experience_years": 7,
+    "qualifications": "MBBS, MS (ENT)",
+    "fee_inr": 800,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 7 years of simulated experience in ent, with listed interests in nose, throat, sinus. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "ent",
+      "ear",
+      "nose",
+      "throat",
+      "sinus"
+    ]
+  },
+  {
+    "id": "demo-19",
+    "name": "Dr. Samar Khan",
+    "fictional": true,
+    "specialty": "Orthopaedics",
+    "city": "Pune",
+    "experience_years": 14,
+    "qualifications": "MBBS, MS (Orthopaedics)",
+    "fee_inr": 1100,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 14 years of simulated experience in orthopaedics, with listed interests in joint, knee, back pain. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "orthopaedics",
+      "orthopedic",
+      "joint",
+      "knee",
+      "back pain"
+    ]
+  },
+  {
+    "id": "demo-20",
+    "name": "Dr. Avni Patel",
+    "fictional": true,
+    "specialty": "General medicine",
+    "city": "Mumbai",
+    "experience_years": 10,
+    "qualifications": "MBBS, MD (General Medicine)",
+    "fee_inr": 600,
+    "languages": [
+      "English",
+      "Hindi"
+    ],
+    "availability": "Demo schedule only; no real appointments",
+    "resume": "Fictional demonstration profile. 10 years of simulated experience in general medicine, with listed interests in fatigue, primary care, general physician. Qualifications and experience are invented for this demo.",
+    "keywords": [
+      "general medicine",
+      "fever",
+      "fatigue",
+      "primary care",
+      "general physician"
+    ]
+  }
+]
