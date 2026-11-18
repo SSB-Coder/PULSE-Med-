@@ -55,6 +55,19 @@ def get_vector_store():
     return PineconeVectorStore(index_name=os.getenv("PINECONE_INDEX", "pulse-medical-db"), embedding=embed)
 
 
+DEFAULT_AI_MODEL = "qwen/qwen3.8-27b"
+
+
+def ai_completion_options():
+    """One model configuration for conversation and document transcription."""
+    model = os.getenv("AI_MODEL", DEFAULT_AI_MODEL).strip() or DEFAULT_AI_MODEL
+    options = {"model": model}
+    if model == DEFAULT_AI_MODEL:
+        # Instruct mode: only the final answer is returned to the UI or review form.
+        options.update(reasoning_effort="none", reasoning_format="hidden")
+    return options
+
+
 def get_groq():
     from groq import Groq
     key = os.getenv("GROQ_API_KEY")

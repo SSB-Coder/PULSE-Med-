@@ -18,6 +18,8 @@ HEADERS = {"Authorization": "Bearer user-a-token"}
 
 @pytest.fixture
 def client(monkeypatch):
+    monkeypatch.delenv("AI_MODEL", raising=False)
+    monkeypatch.setenv("PHOTO_EXTRACTION_ENABLED", "true")
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test")
     def verify(token):
@@ -130,7 +132,7 @@ def test_doctor_filters_and_fictional_catalog(client):
 
 def test_photo_requires_consent_and_configuration(client, monkeypatch):
     files = {"image": ("report.png", image_bytes(), "image/png")}
-    monkeypatch.setenv("VISION_MODEL", "")
+    monkeypatch.setenv("PHOTO_EXTRACTION_ENABLED", "false")
     assert client.post("/history/extract", files=files, headers=HEADERS).status_code == 400
     assert client.post("/history/extract", files=files, data={"consent": "true"}, headers=HEADERS).status_code == 503
 
@@ -138,9 +140,9 @@ def test_photo_requires_consent_and_configuration(client, monkeypatch):
 @pytest.mark.parametrize("configured_model", [None, "test-vision-model"])
 def test_photo_is_only_transcribed_never_saved(client, monkeypatch, configured_model):
     if configured_model is None:
-        monkeypatch.delenv("VISION_MODEL", raising=False)
+        monkeypatch.delenv("AI_MODEL", raising=False)
     else:
-        monkeypatch.setenv("VISION_MODEL", configured_model)
+        monkeypatch.setenv("AI_MODEL", configured_model)
     groq = Mock()
     groq.chat.completions.create.return_value = fake_completion("Medication: [unclear], 5 mg")
     monkeypatch.setattr(services, "get_groq", lambda: groq)
@@ -162,7 +164,7 @@ def test_photo_is_only_transcribed_never_saved(client, monkeypatch, configured_m
 
 
 def test_photo_validation_uses_bytes_not_filename(client, monkeypatch):
-    monkeypatch.setenv("VISION_MODEL", "test-vision-model")
+    monkeypatch.setenv("AI_MODEL", "test-vision-model")
     for data, expected in [(b"fake image", 415), (b"x" * (main.MAX_IMAGE_BYTES + 1), 413)]:
         response = client.post("/history/extract", headers=HEADERS, data={"consent": "true"},
                                files={"image": ("report.png", data, "image/png")})
@@ -221,3 +223,33 @@ def test_chat_proactively_matches_symptoms_and_only_consented_history(client, mo
     assert response.json()["doctors"][0]["specialty"] == "Neurology"
     assert all(d["specialty"] not in ("Cardiology", "Dermatology") for d in response.json()["doctors"])
     assert "Earlier in this conversation" in response.json()["doctors"][0]["match_reason"]
+
+
+@pytest.mark.parametrize('configured_model', [None, 'test-multimodal-model'])
+def test_chat_and_photo_use_one_model_setting(client, monkeypatch, configured_model):
+    if configured_model:
+        monkeypatch.setenv('AI_MODEL', configured_model)
+    # Stale deployment variables must not silently restore a second model.
+    monkeypatch.setenv('CHAT_MODEL', 'old-chat-model')
+    monkeypatch.setenv('VISION_MODEL', 'old-vision-model')
+    store = Mock()
+    store.similarity_search.return_value = []
+    monkeypatch.setattr(services, 'get_vector_store', lambda: store)
+    groq = Mock()
+    groq.chat.completions.create.return_value = fake_completion('Readable output')
+    monkeypatch.setattr(services, 'get_groq', lambda: groq)
+    assert client.post('/chat', json={'messages': [{'role': 'user', 'content': 'I have headaches'}]}).status_code == 200
+    chat_options = groq.chat.completions.create.call_args.kwargs
+    assert client.post('/history/extract', headers=HEADERS, data={'consent': 'true'},
+                       files={'image': ('report.png', image_bytes(), 'image/png')}).status_code == 200
+    photo_options = groq.chat.completions.create.call_args.kwargs
+    assert chat_options['model'] == photo_options['model'] == (configured_model or services.DEFAULT_AI_MODEL)
+    if configured_model is None:
+        for options in (chat_options, photo_options):
+            assert options['reasoning_effort'] == 'none'
+            assert options['reasoning_format'] == 'hidden'
+    else:
+        assert 'reasoning_format' not in chat_options
+    prompt = chat_options['messages'][0]['content']
+    assert 'Do not duplicate those details in Markdown tables' in prompt
+    assert 'If asked about authenticity, explain honestly' in prompt

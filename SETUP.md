@@ -140,29 +140,30 @@ Pinecone secrets and add the following. `.env.example` documents every variable.
 | `SUPABASE_PUBLISHABLE_KEY` | Your project's publishable key |
 | `ALLOWED_ORIGINS` | Your exact frontend origin, e.g. `https://pulse-med.vercel.app` |
 | `PINECONE_INDEX` | Optional; defaults to `pulse-medical-db` |
-| `CHAT_MODEL` | Optional; defaults to `openai/gpt-oss-120b` |
-| `VISION_MODEL` | `qwen/qwen3.8-27b` (also the code default) |
+| `AI_MODEL` | `qwen/qwen3.8-27b`; shared by chat and photo transcription |
+| `PHOTO_EXTRACTION_ENABLED` | Optional; defaults to `true`. Set `false` to disable photos. |
 
 `ALLOWED_ORIGINS` is comma-separated, with no trailing slash on each origin. Include
 `http://localhost:5500` and `http://127.0.0.1:5500` only if you want local frontend testing
 against that backend. The existing MiniLM embeddings and Pinecone collection are unchanged.
 
-## 5. Confirm Qwen photo-to-text access
+## 5. Confirm shared Qwen model access
 
-GPT-OSS is text-only. Photo transcription uses **Qwen `qwen/qwen3.8-27b` on Groq**;
-GPT-OSS receives the saved, reviewed text when the user enables history in chat.
+Both chat and photo transcription use **Qwen `qwen/qwen3.8-27b` on Groq**, through the
+single `AI_MODEL` setting. Photo transcription remains a separate user action with consent
+and review before saving. The model uses instruct mode with reasoning hidden from the UI.
 
-1. Confirm that `qwen/qwen3.8-27b` is available in your Groq account. It is listed in the
-   current vision documentation at <https://console.groq.com/docs/vision>.
-2. Set `VISION_MODEL=qwen/qwen3.8-27b` on the backend for explicit configuration, or leave
-   the variable unset to use that default. If you previously set an empty value, replace it.
+1. Confirm that `qwen/qwen3.8-27b` is available in your Groq account. See
+   <https://console.groq.com/docs/model/qwen/qwen3.8-27b>.
+2. Set `AI_MODEL=qwen/qwen3.8-27b` in Hugging Face Settings. Remove old `CHAT_MODEL` and
+   `VISION_MODEL` variables to avoid confusion; this version no longer reads them.
    No additional API key or separate vision service is required.
 3. Rebuild/restart the Space to apply the code and configuration.
 
-Setting `VISION_MODEL` explicitly blank disables extraction while keeping the typed form usable.
-Groq currently lists Qwen and GPT-OSS on its Free plan; confirm your account's access and
-limits at <https://console.groq.com/settings/limits>. Images consume the token allowance.
-Stay on the Free plan for quota-limited free usage; this code does not enable a paid plan.
+Set `PHOTO_EXTRACTION_ENABLED=false` to disable photos while keeping typed history usable.
+Qwen is currently listed as a preview model by Groq. Confirm your account's model access and
+quotas at <https://console.groq.com/settings/limits>; do not assume unlimited free usage.
+Chat and image requests now use the same model's allowance. This code does not enable billing.
 
 The flow is:
 

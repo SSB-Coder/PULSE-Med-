@@ -1,0 +1,20 @@
+PULSE - FICTIONAL MEDICAL HISTORY FOR TESTING
+No real patient information. Not a prescription.
+
+Conditions
+Hypertension diagnosed in 2022. Recurrent migraines diagnosed in 2021.
+
+Current medications
+Amlodipine, 5 mg once daily, listed as an existing medication in this fictional record. No other regular medication recorded.
+
+Allergies
+Penicillin: itchy rash reported after use in childhood. No other allergies recorded.
+
+Surgeries / hospital stays
+Appendectomy in 2014. No other hospital stays recorded.
+
+Relevant family history
+Father has hypertension. Mother has a history of migraines.
+
+Additional notes / reviewed document text
+Fictional patient: Alex Demo, age 34, based in Pune. Recurring headaches for three days, described as similar to previous headaches. Works at a computer for long hours and reports irregular sleep this week. Would like to discuss the headaches and explore relevant doctor profiles. This is synthetic test data, not a diagnosis or treatment recommendation.

@@ -11,8 +11,8 @@ pinned: false
 # PULSE — Medical Information Assistant
 
 PULSE combines a FastAPI backend on Hugging Face Spaces with a static HTML/CSS/JavaScript
-frontend on Vercel. Medical reference retrieval uses MiniLM and Pinecone; GPT-OSS 120B on
-Groq generates responses.
+frontend on Vercel. Medical reference retrieval uses MiniLM and Pinecone; Qwen 27B on
+Groq handles both chat and document-photo transcription through one shared `AI_MODEL` setting.
 
 This update adds **email/password login, an optional medical-history form, photo-to-text with
 review, and a fictional doctor directory**. Follow [SETUP.md](SETUP.md) to connect your
@@ -34,6 +34,7 @@ cloud accounts, database migration, credentials, and deployment still require se
 - **Fictional doctors:** 20 JSON profiles, including resume text, with topic, city, specialty,
   and fee filters. Chat proactively matches current symptoms, earlier user messages, and saved history when explicitly enabled. Current-message matches take priority, and cards explain which context matched. Matching is based on catalog keywords; the model explains the supplied profiles.
   These invented profiles cannot be booked and are not clinical referrals.
+- **Readable chat:** doctor details appear in cards rather than duplicated comparison tables. Wide Markdown tables scroll horizontally, and message blocks retain their full height in the conversation.
 - **Safer chat rendering:** sanitize assistant Markdown; clear chat when accounts, history,
   or history-sharing preferences change.
 
@@ -50,8 +51,9 @@ Static frontend (Vercel)
         ├── Supabase Auth verifies user → medical_profiles (RLS, caller JWT)
         ├── MiniLM → existing Pinecone medical reference index
         ├── data/doctors.json → deterministic directory matching
-        ├── Groq GPT-OSS → chat response
-        └── optional Groq vision model → transcription preview only
+        └── Groq Qwen 27B (AI_MODEL)
+              ├── chat response
+              └── optional photo transcription preview
 ```
 
 The existing embedding model is `sentence-transformers/all-MiniLM-L6-v2`. This update does
@@ -155,9 +157,9 @@ embedding model at runtime; retrieval initializes lazily on the first chat reque
 
 - Supabase email authentication and hosted services require owner configuration before account features work.
   Email confirmation and password reset require working SMTP delivery; see SETUP.md.
-- Photo transcription defaults to Groq's `qwen/qwen3.8-27b`, using the same Groq API key as chat.
-  `VISION_MODEL` can override it; setting it explicitly empty disables extraction.
-  GPT-OSS itself is text-only. Images are JPEG/PNG/WebP, up to 5 MB; PDF and HEIC are not supported.
+- Both chat and photo transcription use Groq's `qwen/qwen3.8-27b` through `AI_MODEL`.
+  Set `PHOTO_EXTRACTION_ENABLED=false` to disable photo extraction. Old `CHAT_MODEL` and
+  `VISION_MODEL` settings are no longer read. Images are JPEG/PNG/WebP, up to 5 MB; PDF and HEIC are not supported.
 - AI transcription may be wrong, particularly with handwriting; user review is required.
 - Doctor matching uses catalog keywords and filters, not a clinical suitability assessment.
 - Chat/vision inference use provider quotas and can incur charges under your account's plan.

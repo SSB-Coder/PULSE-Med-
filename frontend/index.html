@@ -36,7 +36,7 @@
                     <input id="use-history" type="checkbox"> Use saved history for replies and doctor matches (shares it with Groq)
                 </label>
                 <button id="logout-btn" class="sidebar-action-btn" type="button" hidden>Sign out</button>
-                <button id="doctors-btn" class="sidebar-action-btn" type="button">Explore demo doctors</button>
+                <button id="doctors-btn" class="sidebar-action-btn" type="button">Explore doctors</button>
             </div>
             <div class="sidebar-section">
                 <p class="sidebar-label">About</p>
@@ -46,7 +46,7 @@
             </div>
 
             <div class="sidebar-footer">
-                <span>GPT-OSS · Pinecone · Supabase</span>
+                <span>Qwen · Pinecone · Supabase</span>
             </div>
         </aside>
 
@@ -67,7 +67,7 @@
                 <div class="welcome-screen" id="welcome-screen">
                     <div class="welcome-icon">🩺</div>
                     <h2>Welcome to PULSE</h2>
-                    <p>Tell us what is bothering you today. PULSE can explain health topics and suggest fictional doctor profiles based on your symptoms and the history you choose to share.</p>
+                    <p>Tell us what is bothering you today. PULSE can explain health topics and suggest doctor profiles based on your symptoms and the history you choose to share.</p>
                     <div class="suggestion-chips">
                         <button class="chip" onclick="fillInput(this)">What are symptoms of diabetes?</button>
                         <button class="chip" onclick="fillInput(this)">How does ibuprofen work?</button>
@@ -103,7 +103,7 @@
             <div class="auth-benefits">
                 <p><strong>01 · Tell your story</strong><br>Type your history or add a photo of a written report.</p>
                 <p><strong>02 · Understand your concerns</strong><br>Ask questions with the context you choose to share.</p>
-                <p><strong>03 · Explore a next step</strong><br>Discover relevant profiles in our fictional doctor directory.</p>
+                <p><strong>03 · Explore a next step</strong><br>Discover relevant profiles in our doctor directory.</p>
             </div>
             <small>Educational information. For urgent medical concerns, seek local emergency care.</small>
         </section>
@@ -134,7 +134,7 @@
         <div id="guest-entry" class="guest-entry">
             <span>or explore first</span>
             <button id="guest-btn" type="button">Continue as guest <span aria-hidden="true">→</span></button>
-            <p class="small-text">Chat and explore demo doctors without an account. Log in to save medical history.</p>
+            <p class="small-text">Chat and explore doctor profiles without an account. Log in to save medical history.</p>
         </div>
         </section>
         </div>
@@ -186,11 +186,11 @@
     </dialog>
     <dialog id="doctors-dialog" aria-labelledby="doctors-title">
         <div class="dialog-heading">
-            <h2 id="doctors-title">Fictional doctor directory</h2>
+            <h2 id="doctors-title">Doctor directory</h2>
             <button type="button" data-close="doctors-dialog" aria-label="Close doctor directory">✕</button>
         </div>
-        <p class="small-text">All profiles, qualifications, fees, and schedules are invented demo data.
-            Matches reflect listed interests, not verified suitability. No appointments can be booked.</p>
+        <p class="small-text">Demo directory: sample profiles with invented credentials, fees, and schedules.
+            Matches reflect listed interests. No appointments can be booked.</p>
         <form id="doctor-filters" class="doctor-filters">
             <label>Topic or specialty<input name="query" maxlength="2000" placeholder="e.g. migraine or dermatology"></label>
             <label>City<select name="city"><option value="">All cities</option></select></label>

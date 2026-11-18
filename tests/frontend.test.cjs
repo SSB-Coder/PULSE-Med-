@@ -10,7 +10,7 @@ function setup() {
             disabled: false, open: false, children: [], style: {},
             appendChild(child) { this.children.push(child); }, append(...children) { this.children.push(...children); },
             replaceChildren(...children) { this.children = children; }, remove() { this.removed = true; },
-            setAttribute() {}, focus() {}, setCustomValidity() {}, reportValidity() {},
+            querySelectorAll() { return []; }, setAttribute() {}, focus() {}, setCustomValidity() {}, reportValidity() {},
             showModal() { this.open = true; }, close() { this.open = false; },
             classList: { toggle() {}, contains() { return false; }, add() {} }
         };
@@ -288,4 +288,27 @@ test('restored session enters the app and sign-out returns to login with consent
     assert.equal(get('auth-dialog').open, true);
     assert.equal(get('use-history').checked, false);
     assert.equal(run('chatHistory.length'), 0);
+});
+
+test('sanitized Markdown tables receive a keyboard-accessible horizontal scroll wrapper', () => {
+    const { context, get, run } = setup();
+    let wrapper;
+    const table = { replaceWith(node) { wrapper = node; } };
+    context.window.marked = context.marked = { parse: () => '<table><tr><td>Doctor</td></tr></table>' };
+    context.window.DOMPurify = context.DOMPurify = { sanitize: (html) => html };
+    const baseCreate = context.document.createElement;
+    context.document.createElement = () => {
+        const element = baseCreate();
+        element.querySelectorAll = () => [table];
+        element.attributes = {};
+        element.setAttribute = (key, value) => { element.attributes[key] = value; };
+        return element;
+    };
+    run("appendMessage('assistant', 'comparison', $('chat-box'))");
+    assert.equal(wrapper.className, 'table-scroll');
+    assert.equal(wrapper.tabIndex, 0);
+    assert.equal(wrapper.attributes.role, 'region');
+    assert.equal(wrapper.attributes['aria-label'], 'Scrollable comparison table');
+    assert.equal(wrapper.children[0], table);
+    assert.match(get('chat-box').children[0].innerHTML, /<table>/);
 });

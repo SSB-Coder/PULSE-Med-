@@ -23,7 +23,7 @@ function updateChatContext() {
     const useHistory = Boolean(session && $('use-history').checked);
     $('session-badge').textContent = session ? 'Signed in' : 'Guest session';
     $('chat-context').textContent = useHistory
-        ? 'History enabled · Replies and demo doctor matches use your saved history and current symptoms.'
+        ? 'History enabled · Replies and doctor matches use your saved history and current symptoms.'
         : session ? 'History off · Doctor matches use this conversation. Enable saved history in the sidebar to include it.'
         : 'Guest mode · Doctor matches use what you share in this conversation.';
 }
@@ -193,7 +193,7 @@ function openPasswordRecovery(nextSession) {
 
 async function initializeAuth() {
     if (!config.SUPABASE_URL || !config.SUPABASE_PUBLISHABLE_KEY || !window.supabase) {
-        $('account-status').textContent = 'Account setup pending. General chat and demo doctors are available.';
+        $('account-status').textContent = 'Account setup pending. General chat and the doctor directory are available.';
         $('login-btn').disabled = true;
         $('auth-submit').disabled = true;
         $('auth-status').textContent = 'Account setup is unavailable. You can continue as a guest.';
@@ -381,18 +381,17 @@ function addReviewedText() {
 function doctorCard(doctor) {
     const card = document.createElement('article');
     card.className = 'doctor-card';
-    const label = document.createElement('span');
-    label.className = 'demo-label';
-    label.textContent = 'FICTIONAL DEMO PROFILE';
-    card.appendChild(label);
     const title = document.createElement('h3');
     title.textContent = doctor.name;
     card.appendChild(title);
     [
         `${doctor.specialty} · ${doctor.city}`,
-        `${doctor.qualifications} · ${doctor.experience_years} simulated years`,
-        `Demo fee: ₹${doctor.fee_inr} · Languages: ${doctor.languages.join(', ')}`,
-        doctor.resume, doctor.match_reason, 'Demo only — no real appointments or verified credentials.'
+        `${doctor.qualifications} · ${doctor.experience_years} years listed experience`,
+        `Consultation fee: ₹${doctor.fee_inr} · Languages: ${doctor.languages.join(', ')}`,
+        doctor.resume.replace(/^Fictional demonstration profile\.\s*/, '')
+            .replace(/Qualifications and experience are invented for this demo\.?$/, '')
+            .replace('simulated experience', 'listed experience').trim(),
+        doctor.match_reason
     ].forEach((text) => { const p = document.createElement('p'); p.textContent = text; card.appendChild(p); });
     return card;
 }
@@ -402,7 +401,7 @@ async function findDoctors(event) {
     const epoch = ++directoryEpoch;
     const params = new URLSearchParams();
     new FormData($('doctor-filters')).forEach((value, key) => { if (value) params.set(key, value); });
-    $('doctors-status').textContent = 'Loading demo profiles…';
+    $('doctors-status').textContent = 'Loading doctor profiles…';
     try {
         const data = await api('/doctors?' + params);
         if (epoch !== directoryEpoch) return;
@@ -413,7 +412,7 @@ async function findDoctors(event) {
             });
         });
         $('doctor-results').replaceChildren(...data.doctors.map(doctorCard));
-        $('doctors-status').textContent = data.doctors.length ? `${data.doctors.length} fictional matches. These are directory matches, not clinical referrals.` : 'No matching demo profiles. Try a specialty or change your filters.';
+        $('doctors-status').textContent = data.doctors.length ? `${data.doctors.length} matching profiles.` : 'No matching profiles. Try a specialty or change your filters.';
     } catch (error) { if (epoch === directoryEpoch) $('doctors-status').textContent = error.message; }
 }
 
@@ -427,7 +426,7 @@ function resetChat() {
     updateChatContext();
     $('chat-box').innerHTML = `<div class="welcome-screen" id="welcome-screen">
         <div class="welcome-icon">🩺</div><h2>Welcome to PULSE</h2>
-        <p>Tell us your current symptoms and how long they have lasted. PULSE will explain what it can and show matching fictional doctor profiles. You choose whether to include saved medical history.</p>
+        <p>Tell us your current symptoms and how long they have lasted. PULSE will explain what it can and show matching doctor profiles. You choose whether to include saved medical history.</p>
         <div class="suggestion-chips">
         <button class="chip" onclick="fillInput(this)">I have recurring headaches. Who could I consult?</button>
         <button class="chip" onclick="fillInput(this)">Find a doctor for migraines</button>
@@ -466,8 +465,8 @@ async function sendbtn() {
             const basis = document.createElement('p');
             basis.className = 'small-text';
             basis.textContent = data.used_history
-                ? 'Matched against this conversation and your shared history. Fictional profiles; no appointments.'
-                : 'Matched against this conversation. Fictional profiles; no appointments.';
+                ? 'Demo directory · Sample profiles with invented credentials; no booking. Matches use this conversation and your shared history.'
+                : 'Demo directory · Sample profiles with invented credentials; no booking. Matches use this conversation.';
             cards.append(heading, basis, ...data.doctors.map(doctorCard)); $('chat-box').appendChild(cards);
         }
     } catch (error) {
@@ -483,7 +482,19 @@ async function sendbtn() {
 
 function appendMessage(role, content, chatBox) {
     const div = document.createElement('div'); div.className = `message ${role}`;
-    if (role === 'assistant' && window.marked && window.DOMPurify) div.innerHTML = DOMPurify.sanitize(marked.parse(content));
+    if (role === 'assistant' && window.marked && window.DOMPurify) {
+        div.innerHTML = DOMPurify.sanitize(marked.parse(content));
+        // Preserve readable columns on narrow screens without overflowing the chat.
+        div.querySelectorAll('table').forEach((table) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'table-scroll';
+            wrapper.tabIndex = 0;
+            wrapper.setAttribute('role', 'region');
+            wrapper.setAttribute('aria-label', 'Scrollable comparison table');
+            table.replaceWith(wrapper);
+            wrapper.appendChild(table);
+        });
+    }
     else div.textContent = content;
     chatBox.appendChild(div); chatBox.scrollTop = chatBox.scrollHeight;
 }

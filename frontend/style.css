@@ -559,3 +559,16 @@ dialog textarea { resize: vertical; min-height: 70px; }
     .auth-gated .auth-panel { padding: 28px 24px 40px; }
     .session-badge { display: none; }
 }
+
+/* Keep Markdown comparisons readable instead of crushing each column. */
+.chat-container, .chat-box { min-width: 0; min-height: 0; }
+.chat-box > .message, .chat-box > .doctor-results { flex-shrink: 0; }
+.message { min-width: 0; word-break: normal; overflow-wrap: anywhere; }
+.table-scroll { max-width: 100%; overflow-x: auto; margin: 12px 0; border: 1px solid var(--slate-200); border-radius: var(--radius-sm); }
+.table-scroll table { width: 100%; min-width: 600px; border-collapse: collapse; font-size: .84rem; }
+.table-scroll th, .table-scroll td { min-width: 100px; padding: 10px 12px; text-align: left; vertical-align: top; word-break: normal; overflow-wrap: normal; line-height: 1.55; border-bottom: 1px solid var(--slate-200); }
+.table-scroll th { background: var(--slate-50); font-weight: 600; }
+.table-scroll tr:last-child td { border-bottom: 0; }
+.message.assistant pre { max-width: 100%; overflow-x: auto; padding: 12px; background: var(--slate-50); border-radius: var(--radius-sm); }
+.chat-box > .doctor-results { width: min(100%, 780px); margin-top: 0; }
+.doctor-card { overflow-wrap: anywhere; }
