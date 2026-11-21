@@ -40,12 +40,6 @@ def verify_user(token):
         raise HTTPException(401, "Invalid account session.") from None
 
 
-def get_profile(user_id, token):
-    rows = supabase_request("GET", "/rest/v1/medical_profiles", token,
-                            params={"user_id": f"eq.{user_id}", "select": "history,updated_at"})
-    return rows[0] if rows else None
-
-
 @lru_cache(maxsize=1)
 def get_vector_store():
     # Keep heavy model imports out of account routes and unit tests.
@@ -74,3 +68,11 @@ def get_groq():
     if not key:
         raise HTTPException(503, "AI features are not configured yet.")
     return Groq(api_key=key, timeout=45, max_retries=1)
+
+
+def owned_row(table, row_id, user_id, token):
+    rows = supabase_request("GET", f"/rest/v1/{table}", token,
+                            params={"id": f"eq.{row_id}", "user_id": f"eq.{user_id}", "limit": "1"})
+    if not rows:
+        raise HTTPException(404, "The requested item was not found in your account.")
+    return rows[0]

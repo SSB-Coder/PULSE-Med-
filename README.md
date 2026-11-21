@@ -25,8 +25,8 @@ cloud accounts, database migration, credentials, and deployment still require se
 - **Account entry:** a full-page login/create-account screen with a Continue as guest option. Existing sessions open the app directly; signing out returns to login.
 - **Email/password login:** registration, login, email confirmation, and password reset through
   Supabase Auth. Supabase stores salted bcrypt hashes; PULSE never persists raw passwords.
-- **Personal history:** conditions, medications, allergies, surgeries, family history, and notes.
-  Users can edit or delete their record and explicitly opt in to including it in chat.
+- **Medical-history library:** multiple named records containing conditions, medications, allergies, surgeries, family history, and reviewed document text. Choose a main record separately for each chat and explicitly enable sharing.
+- **Saved conversations:** signed-in chats persist in Supabase and can be reopened or deleted from the sidebar. Titles use a short subject from the first user message without another model call. Guest chats stay in memory for the current visit.
 - **Account isolation:** FastAPI verifies the caller's token through Supabase Auth, and database
   requests use that same token so row-level security applies. No service-role key is required.
 - **Optional document photo transcription:** camera/file input → Groq vision model → editable
@@ -48,7 +48,7 @@ conditions from photographs. All doctor data is fictional.
 Static frontend (Vercel)
   ├── Supabase Auth → email/password (salted bcrypt hashes)
   └── FastAPI (Hugging Face Space)
-        ├── Supabase Auth verifies user → medical_profiles (RLS, caller JWT)
+        ├── Supabase Auth verifies user → medical_records + conversations (RLS, caller JWT)
         ├── MiniLM → existing Pinecone medical reference index
         ├── data/doctors.json → deterministic directory matching
         └── Groq Qwen 27B (AI_MODEL)
@@ -105,9 +105,16 @@ The frontend has no build step and no Node dependency installation is needed for
 | --- | --- | --- |
 | `GET /health` | None | Process health; does not probe external services |
 | `POST /chat` | Optional; required for `use_history: true` | Reference-based chat and optional fictional doctor cards |
-| `GET /profile` | Required | Current user's saved history or `null` |
-| `PUT /profile` | Required | Save current user's history |
-| `DELETE /profile` | Required | Delete current user's history; account remains |
+| `GET /medical-records` | Required | List named records without their full medical text |
+| `POST /medical-records` | Required | Create a named medical-history record |
+| `GET /medical-records/{id}` | Required | Read one owned record |
+| `PUT /medical-records/{id}` | Required | Edit one owned record |
+| `DELETE /medical-records/{id}` | Required | Remove one record and detach it from chats |
+| `GET /conversations` | Required | Paginated titles and metadata, without messages |
+| `POST /conversations` | Required | Create a chat with title derived from its first user message |
+| `GET /conversations/{id}` | Required | Restore messages, doctor cards, and record selection |
+| `PUT /conversations/{id}` | Required | Save messages and selection, with revision conflict protection |
+| `DELETE /conversations/{id}` | Required | Delete the owned chat |
 | `POST /history/extract` | Required | Multipart image + `consent=true`; return review text without saving |
 | `GET /doctors` | None | Fictional catalog; optional `query`, `city`, `specialty`, `max_fee` filters |
 
@@ -123,10 +130,11 @@ Example chat request:
 }
 ```
 
-Example profile update:
+Example medical-record creation:
 
 ```json
 {
+  "name": "General history",
   "history": {
     "conditions": "Asthma",
     "medications": "",
@@ -140,12 +148,16 @@ Example profile update:
 
 `/chat` returns `reply`, `doctors`, and `used_history`. History fields are optional strings
 with length limits. Chat accepts user/assistant roles only, up to 40 messages, each at most
-8,000 characters; the browser sends a recent window. Conversation content is kept in memory,
-not persisted across refreshes.
+8,000 characters; the browser sends a recent window. Signed-in conversations store up to 200
+messages in Supabase; guest conversations stay in memory. `medical_record_id` selects the only
+saved history loaded when `use_history` is true. Selecting a record does not itself enable sharing.
+Changing the record affects future replies; existing messages are retained. Old `/profile` routes
+return HTTP 410 so outdated frontends refresh instead of writing hidden legacy history.
 
 ## Deployment
 
 Deploy the Dockerfile to the existing HF Space and the `frontend/` directory to Vercel.
+Run `supabase/chat_history_migration.sql` after the original schema before deploying this update.
 See [SETUP.md](SETUP.md) for environment values and account steps. Never commit `.env` or put
 Groq, Pinecone, user passwords, or Supabase secret keys in browser configuration.
 A Supabase publishable key is intentionally public; database row-level security protects records.

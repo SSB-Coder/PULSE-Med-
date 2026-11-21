@@ -1,5 +1,6 @@
 """Validated API inputs. Medical history is user-reported, not a diagnosis."""
 from typing import Literal
+from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -27,3 +28,31 @@ class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     messages: list[ChatMessage] = Field(min_length=1, max_length=40)
     use_history: bool = False
+    medical_record_id: UUID | None = None
+
+
+class MedicalRecordInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    name: str = Field(min_length=1, max_length=100)
+    history: MedicalHistory
+
+
+class DoctorReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=64)
+    reason: str = Field(default="", max_length=1000)
+
+
+class SavedMessage(ChatMessage):
+    model_config = ConfigDict(extra="forbid")
+    content: str = Field(min_length=1, max_length=16000)
+    doctor_matches: list[DoctorReference] = Field(default_factory=list, max_length=3)
+    used_history: bool = False
+
+
+class ConversationInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    messages: list[SavedMessage] = Field(default_factory=list, max_length=200)
+    medical_record_id: UUID | None = None
+    use_history: bool = False
+    revision: int = Field(default=1, ge=1, le=2147483646)

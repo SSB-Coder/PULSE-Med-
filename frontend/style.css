@@ -572,3 +572,26 @@ dialog textarea { resize: vertical; min-height: 70px; }
 .message.assistant pre { max-width: 100%; overflow-x: auto; padding: 12px; background: var(--slate-50); border-radius: var(--radius-sm); }
 .chat-box > .doctor-results { width: min(100%, 780px); margin-top: 0; }
 .doctor-card { overflow-wrap: anywhere; }
+
+/* Saved conversations and per-chat medical records. */
+.conversation-section .small-text { color: var(--slate-400); margin-bottom: 10px; }
+.conversation-list { display: grid; gap: 4px; }
+.conversation-row { display: flex; gap: 4px; border-radius: var(--radius-sm); }
+.conversation-row:has([aria-current="true"]) { background: rgba(255,255,255,.1); }
+.conversation-row button { background: transparent; border: 0; color: var(--slate-300); cursor: pointer; font: inherit; font-size: .82rem; padding: 10px 8px; border-radius: var(--radius-sm); }
+.conversation-row button:hover { background: rgba(255,255,255,.08); color: white; }
+.conversation-open { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.conversation-delete { flex-shrink: 0; font-size: 1.1rem !important; }
+#chat-record-select { width: 100%; margin: 8px 0; padding: 9px; background: var(--slate-800); color: white; border: 1px solid var(--slate-500); border-radius: var(--radius-sm); font: inherit; }
+.active-chat-title { color: var(--slate-500); font-family: var(--font-body); font-size: .78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; margin-left: 12px; }
+.records-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; }
+.records-toolbar h3 { font-size: 1rem; }
+.medical-record-list { display: grid; gap: 8px; margin: 12px 0 20px; max-height: 230px; overflow-y: auto; }
+.medical-record-row { display: flex; gap: 8px; padding: 8px; border: 1px solid var(--slate-200); border-radius: var(--radius-sm); background: var(--slate-50); }
+.record-name-button { flex: 1; text-align: left; overflow-wrap: anywhere; }
+.record-name-button[aria-pressed="true"] { border-color: var(--blue-600); }
+#history-form { border-top: 1px solid var(--slate-200); padding-top: 10px; }
+@media (max-width: 760px) { .active-chat-title { display: none; } .medical-record-row { flex-direction: column; } }
+.conversation-list { max-height: min(36dvh, 360px); overflow-y: auto; }
+.topbar-title { min-width: 0; }
+.history-context-help { display: block; font-size: .73rem; line-height: 1.5; }

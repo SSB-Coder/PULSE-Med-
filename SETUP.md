@@ -4,7 +4,7 @@ The code is prepared locally. No cloud project was created, no paid resources we
 and no deployment or database migration has been performed.
 
 The frontend remains a static site. FastAPI runs on the existing Hugging Face Docker Space.
-Supabase hosts email/password authentication and one private medical-history record per user. Your PC is not
+Supabase hosts email/password authentication, private named medical-history records, and saved conversations. Your PC is not
 needed once the services are deployed.
 
 ## 1. Create a Supabase project
@@ -39,6 +39,33 @@ The app intentionally uses a publishable key plus each user's access token, incl
 the backend. **Do not use a Supabase secret key or service-role key in either configuration.**
 A publishable key is public configuration; the ownership policies protect the medical records.
 No Storage bucket or vector extension is required for this version.
+
+### Upgrade: chat history and multiple medical records
+
+After `schema.sql`, run **`supabase/chat_history_migration.sql`** in SQL Editor before deploying
+the updated backend and frontend. A successful run normally says **Success. No rows returned**.
+The migration is transactional and can be run again:
+
+- Creates `medical_records` and `conversations`, each with RLS and four owner-only policies.
+- Moves each existing single medical profile into a record named **Medical history**, preserving
+  its contents. The duplicate legacy text is cleared after the copy succeeds. The old profile
+  row is marked as migrated so rerunning SQL does not recreate records you deleted.
+- Starts with an empty conversation list. Chats from the previous version existed only in
+  browser memory and cannot be recovered after the page was closed.
+
+Verify the new tables:
+
+```sql
+select c.relname as table_name, c.relrowsecurity as rls_enabled,
+       (select count(*) from pg_policies p
+        where p.schemaname = 'public' and p.tablename = c.relname) as policy_count
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and c.relname in ('medical_records', 'conversations')
+order by c.relname;
+```
+
+Expected: two rows, **conversations** and **medical_records**, both with **true** and **4**.
+Keep existing provider keys and `AI_MODEL`; no additional service or key is required.
 
 ## 2. Enable email/password login
 
@@ -192,14 +219,15 @@ PDF and HEIC ingestion are not included.
    A manually created/confirmed test account can log in immediately.
 5. Save a test profile using invented data, refresh, and confirm it persists.
 6. Enable **Use saved history for replies and doctor matches** in the sidebar to share that history with Groq for personalization. The chat footer shows whether history is enabled.
-   Changing that toggle resets the current conversation so previously sent history isn't
-   silently reused after opting out. Editing/deleting history and switching accounts reset chat too.
+   Choose the main record in the sidebar first. Each chat remembers the selected record and
+   sharing preference. Changing either affects future replies and preserves existing messages;
+   previously discussed details can remain in the conversation. Start a new chat for a clean context. Editing/deleting history and switching accounts reset chat too.
 7. Try the fictional directory filters, then describe a current symptom such as “I have a headache”. Chat should proactively show relevant profiles without requiring a doctor request. With consented history, matching includes that context and prioritizes the current message. Follow-up details can use symptoms from earlier user turns; assistant messages do not supply patient history.
    Matches come from `data/doctors.json`; they cannot be booked and are not clinical referrals.
 8. If enabled, test photo extraction with a **synthetic** written report. Confirm that
    extraction alone does not save history, then review and save the text explicitly.
 9. Use two separate email/password accounts/browser profiles with different invented histories.
-   Verify each sees only its own history. Anonymous access to `/profile` should return 401.
+   Verify each sees only its own history. Anonymous access to `/medical-records` and `/conversations` should return 401. Test that neither account can fetch, edit, or delete the other account's record/chat IDs.
    Delete one profile and confirm the other account's data remains.
 
 10. Sign out, try an incorrect password, and confirm that access is denied. Test **Forgot
@@ -236,13 +264,52 @@ node --test tests/frontend.test.cjs
 
 ## What this version stores
 
-- **Supabase:** one medical-history JSON record per authenticated user; Supabase Auth manages identity
-  and salted password hashes. No password column is added to the history table.
+- **Supabase:** private named medical-history records and conversation messages, short titles, doctor-match references, selected record IDs, and sharing preferences. Supabase Auth manages identity and salted password hashes. No application password column is added.
 - **Browser:** login session tokens managed by Supabase, plus conversation/history form state in memory.
-  PULSE does not write medical-history content to localStorage.
+  Signed-in chats are saved to Supabase automatically. Guest chats are memory-only and disappear
+  after refresh or account changes. PULSE does not write medical-history content to localStorage.
 - **Repository:** 20 fictional doctor resumes and filterable attributes in `data/doctors.json`.
 - **Pinecone:** the existing medical reference collection; personal history is not embedded or indexed.
 - **Groq:** chat context (including history only when opted in), and photos only when extraction is requested.
 
 For a real patient-data launch, assess the hosting/provider agreements and privacy requirements
 for your deployment. This prepared implementation is a demo, not a certification of compliance.
+
+## Conversation and record acceptance checks
+
+1. Create two named histories (typed or photo transcription with review), with different conditions.
+2. Start a chat, select the first record, explicitly enable sharing, and send a symptom message.
+   Its short title should appear in Chat history and the footer should name the active record.
+3. Start a new chat. It begins with no record selected and sharing off. Select the second record.
+4. Refresh the page and reopen both chats. Each should restore its messages, doctor cards, and its
+   own main-history selection. Changing a selection must not remove existing messages.
+5. Delete a chat through its × button; medical records should remain. Delete a history record;
+   its chats should remain but must stop using the deleted history. Old messages may retain
+   details previously discussed from that record.
+6. Simulate a failed save: the sidebar should report **Chat not saved** with Retry saving chat.
+   Switching/new-chat navigation should preserve unsaved messages until saving succeeds. If
+   another tab has updated a chat, use **Save as a separate chat** to keep your local version.
+7. With two accounts, verify title lists, messages, and histories stay separate. A delayed response
+   from a signed-out account must not restore the old account's data. Guest chats should reopen
+   during the same visit but disappear after refreshing.
+
+Optional local database verification uses PGlite (PostgreSQL in WASM), without live Supabase:
+
+```bash
+npm --prefix /tmp/pulse-sql-check install --no-audit --no-fund @electric-sql/pglite
+PULSE_PGLITE_MODULE=/tmp/pulse-sql-check/node_modules/@electric-sql/pglite node --test tests/storage.integration.cjs
+```
+
+This executes both SQL files and checks migration idempotency, owner isolation, anonymous
+access denial, cross-account record-link rejection, and record deletion. Live Supabase Auth
+and cloud deployment still need the acceptance checks above.
+
+The optional DOM integration test uses the actual HTML and JavaScript with mocked HTTP/Auth:
+
+```bash
+npm --prefix /tmp/pulse-sql-check install --no-audit --no-fund jsdom
+PULSE_JSDOM_MODULE=/tmp/pulse-sql-check/node_modules/jsdom node --test tests/dom.integration.cjs
+```
+
+This checks form controls, multiple record creation, per-chat selection restoration, and deletion
+using the page markup. It does not replace browser visual QA or live cloud checks.

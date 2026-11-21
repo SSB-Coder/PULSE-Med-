@@ -10,7 +10,7 @@ function setup() {
             disabled: false, open: false, children: [], style: {},
             appendChild(child) { this.children.push(child); }, append(...children) { this.children.push(...children); },
             replaceChildren(...children) { this.children = children; }, remove() { this.removed = true; },
-            querySelectorAll() { return []; }, setAttribute() {}, focus() {}, setCustomValidity() {}, reportValidity() {},
+            addEventListener() {}, querySelectorAll() { return []; }, setAttribute() {}, focus() {}, setCustomValidity() {}, reportValidity() {},
             showModal() { this.open = true; }, close() { this.open = false; },
             classList: { toggle() {}, contains() { return false; }, add() {} }
         };
@@ -95,9 +95,11 @@ test('photo extraction requires consent and never saves unreviewed text', async 
     run('addReviewedText()');
     assert.equal(get('history-form').elements.notes.value, 'Reviewed medication text');
     assert.equal(calls.length, 1, 'Reviewing text still must not persist it');
+    get('record-name').value = 'Reviewed report';
     await run('saveHistory({preventDefault(){}})');
     assert.equal(calls.length, 2);
-    assert.equal(calls[1].options.method, 'PUT');
+    assert.equal(calls[1].options.method, 'POST');
+    assert.equal(calls[1].url, 'https://api.example/medical-records');
     assert.equal(JSON.parse(calls[1].options.body).history.notes, 'Reviewed medication text');
 });
 
@@ -281,7 +283,7 @@ test('restored session enters the app and sign-out returns to login with consent
     assert.equal(get('app-shell').hidden, false);
     assert.equal(get('auth-dialog').open, false);
     get('use-history').checked = true;
-    run('resetChat()');
+    run("selectedRecordId = 'record-a'; updateChatContext()");
     assert.match(get('chat-context').textContent, /History enabled/);
     run('applySession(null)');
     assert.equal(get('app-shell').hidden, true);
@@ -311,4 +313,188 @@ test('sanitized Markdown tables receive a keyboard-accessible horizontal scroll 
     assert.equal(wrapper.attributes['aria-label'], 'Scrollable comparison table');
     assert.equal(wrapper.children[0], table);
     assert.match(get('chat-box').children[0].innerHTML, /<table>/);
+});
+
+test('chat titles use a concise first-message subject without a title model request', () => {
+    const { run } = setup();
+    assert.equal(run("shortChatTitle([{role:'user',content:'I have recurring headaches. Who could I consult?'}])"), 'Recurring headaches');
+    assert.equal(run("shortChatTitle([{role:'user',content:'Please help me understand symptoms of diabetes'}])"), 'Symptoms of diabetes');
+    assert.equal(run("shortChatTitle([{role:'user',content:'???'}])"), 'New chat');
+    assert.ok(run("shortChatTitle([{role:'user',content:'x'.repeat(100)}]).length") <= 60);
+});
+
+test('signed-in chat saves, reopens with its own selected record, and continues under the same id', async () => {
+    const { context, get, run } = setup();
+    let saved;
+    const requests = [];
+    context.fetch = async (url, options = {}) => {
+        requests.push({url,options});
+        let data;
+        if (url.endsWith('/chat')) data = {reply:'Let us discuss the symptoms.',doctors:[],used_history:true};
+        else if (url.endsWith('/medical-records')) data = {records:[{id:'record-a',name:'General history'},{id:'record-b',name:'Recent checkup'}]};
+        else if (options.method === 'POST' || options.method === 'PUT') {
+            const body = JSON.parse(options.body);
+            saved = {...body,id:'chat-a',title:'Recurring headaches',revision:saved ? saved.revision+1 : 1};
+            data = {conversation:saved};
+        } else data = {conversation:saved};
+        return {status:200,ok:true,json:async()=>data};
+    };
+    run("session={access_token:'token',user:{id:'user'}}; medicalRecords=[{id:'record-a',name:'General history'},{id:'record-b',name:'Recent checkup'}]; selectedRecordId='record-a'");
+    get('use-history').checked = true;
+    get('user-input').value = 'I have recurring headaches. Who could I consult?';
+    await run('sendbtn()');
+    assert.equal(run('currentConversationId'), 'chat-a');
+    assert.equal(saved.messages.length, 2);
+    assert.equal(saved.medical_record_id, 'record-a');
+    assert.equal(saved.use_history, true);
+    assert.equal(requests.length, 3, 'Save, infer, save; no separate title-generation request');
+    const chatPayload = JSON.parse(requests[1].options.body);
+    assert.equal(chatPayload.medical_record_id, 'record-a');
+    assert.deepEqual(Object.keys(chatPayload.messages[0]), ['role','content']);
+    await run('newChat()');
+    assert.equal(run('selectedRecordId'), null);
+    assert.equal(run('conversationList.length'), 1);
+    await run("openConversation('chat-a')");
+    assert.equal(run('chatHistory.length'), 2);
+    assert.equal(run('selectedRecordId'), 'record-a');
+    assert.equal(get('use-history').checked, true);
+    assert.equal(get('active-chat-title').textContent, 'Recurring headaches');
+    get('chat-record-select').value = 'record-b';
+    await run('changeHistoryContext()');
+    assert.equal(saved.medical_record_id, 'record-b');
+    assert.equal(saved.messages.length, 2, 'Changing the main history must keep chat messages');
+    get('user-input').value = 'It started yesterday';
+    await run('sendbtn()');
+    assert.equal(run('currentConversationId'), 'chat-a');
+    assert.equal(saved.messages.length, 4);
+    assert.equal(saved.medical_record_id, 'record-b');
+});
+
+test('multiple records save independently; reviewed text is kept in its named record', async () => {
+    const { context, get, run } = setup();
+    const saved = [];
+    context.fetch = async (url, options) => {
+        const body = JSON.parse(options.body);
+        const record = {id:'record-'+(saved.length+1),...body};
+        saved.push(record);
+        return {status:201,ok:true,json:async()=>({record})};
+    };
+    run("session={access_token:'token',user:{id:'user'}}; beginMedicalRecord()");
+    get('record-name').value = 'General history';
+    get('history-form').elements.conditions.value = 'Hypertension';
+    await run('saveHistory({preventDefault(){}})');
+    run('beginMedicalRecord()');
+    get('record-name').value = 'November report';
+    get('extracted-text').value = 'Reviewed report text';
+    run('addReviewedText()');
+    await run('saveHistory({preventDefault(){}})');
+    assert.equal(saved.length, 2);
+    assert.equal(saved[0].history.conditions, 'Hypertension');
+    assert.equal(saved[1].history.conditions, '');
+    assert.equal(saved[1].history.notes, 'Reviewed report text');
+    assert.equal(run('medicalRecords.length'), 2);
+    assert.equal(run('selectedRecordId'), null, 'Saving must not implicitly consent to sharing');
+});
+
+test('guest conversations reopen in memory without account-storage calls', async () => {
+    const { context, get, run } = setup();
+    let requests = 0;
+    context.fetch = async (url) => {
+        assert.equal(url,'https://api.example/chat'); requests++;
+        return {status:200,ok:true,json:async()=>({reply:'A reply',doctors:[]})};
+    };
+    get('user-input').value = 'Tell me about sleep';
+    await run('sendbtn()');
+    const id = run('currentConversationId');
+    await run('newChat()');
+    await run(`openConversation('${id}')`);
+    assert.equal(run('chatHistory.length'), 2);
+    assert.equal(requests, 1);
+    assert.match(get('conversation-status').textContent, /this visit only/);
+});
+
+test('failed saves preserve the conversation and block navigation until retry succeeds', async () => {
+    const { context, get, run } = setup();
+    run("session={access_token:'token',user:{id:'user'}}; chatHistory=[{role:'user',content:'Private question'}]; chatDirty=true");
+    context.fetch = async () => ({status:503,ok:false,json:async()=>({detail:'Storage temporarily unavailable'})});
+    await run('newChat()');
+    assert.equal(run('chatHistory.length'), 1);
+    assert.equal(get('retry-chat-save').hidden, false);
+    assert.match(get('conversation-status').textContent,/not saved/);
+    context.fetch = async () => ({status:201,ok:true,json:async()=>({conversation:{id:'saved-chat',revision:1,title:'Private question'}})});
+    await run('newChat()');
+    assert.equal(run('chatHistory.length'), 0);
+    assert.equal(run('conversationList[0].id'), 'saved-chat');
+});
+
+test('late conversation reads and saves cannot expose another account’s data', async () => {
+    const { context, get, run } = setup();
+    const pending = deferred();
+    run("session={access_token:'token',user:{id:'old'}}");
+    context.fetch = () => pending.promise;
+    const opening = run("openConversation('private-chat')");
+    run('applySession(null)');
+    pending.resolve({status:200,ok:true,json:async()=>({conversation:{id:'private-chat',title:'Private diagnosis',messages:[{role:'user',content:'Private data'}]}})});
+    await opening;
+    assert.equal(run('chatHistory.length'), 0);
+    assert.equal(run('conversationList.length'), 0);
+    assert.notEqual(get('active-chat-title').textContent,'Private diagnosis');
+    const saving = deferred();
+    context.fetch = () => saving.promise;
+    run("session={access_token:'token',user:{id:'old'}}; chatHistory=[{role:'user',content:'Private data'}]; chatDirty=true");
+    const save = run('saveCurrentConversation()');
+    run('applySession(null)');
+    saving.resolve({status:201,ok:true,json:async()=>({conversation:{id:'private-chat',title:'Private diagnosis',revision:1}})});
+    await save;
+    assert.equal(run('currentConversationId'), null);
+    assert.equal(run('conversationList.length'), 0);
+});
+
+test('deleting a selected medical record detaches it without clearing chat messages', async () => {
+    const { context, get, run } = setup();
+    context.fetch = async (url, options) => {
+        assert.equal(url, 'https://api.example/medical-records/record-a');
+        assert.equal(options.method,'DELETE');
+        return {status:204,ok:true};
+    };
+    run("session={access_token:'token',user:{id:'user'}}; medicalRecords=[{id:'record-a',name:'History'}]; editingRecordId='record-a'; selectedRecordId='record-a'; currentConversationId='chat-a'; chatHistory=[{role:'user',content:'Prior question'}]");
+    get('use-history').checked = true;
+    await run('deleteHistory()');
+    assert.equal(run('selectedRecordId'),null);
+    assert.equal(get('use-history').checked,false);
+    assert.equal(run('chatHistory.length'),1);
+    assert.equal(run('currentConversationId'),'chat-a');
+    assert.equal(run('medicalRecords.length'),0);
+});
+
+test('a late record-list response cannot hide a newly saved record', async () => {
+    const { context, get, run } = setup();
+    const stale = deferred();
+    context.fetch = async (url, options={}) => options.method === 'POST'
+        ? {status:201,ok:true,json:async()=>({record:{id:'record-a',name:'New history',history:{}}})}
+        : stale.promise;
+    run("session={access_token:'token',user:{id:'user'}}");
+    const loading = run('loadHistory()');
+    get('record-name').value = 'New history';
+    await run('saveHistory({preventDefault(){}})');
+    stale.resolve({status:200,ok:true,json:async()=>({records:[]})});
+    await loading;
+    assert.equal(run('medicalRecords.length'),1);
+    assert.equal(run('medicalRecords[0].id'),'record-a');
+});
+
+test('conflicting saves can be kept as a separate chat without overwriting the remote chat', async () => {
+    const { context, get, run } = setup();
+    run("session={access_token:'token',user:{id:'user'}}; currentConversationId='original'; conversationRevision=1; chatHistory=[{role:'user',content:'Local changes'}]; chatDirty=true");
+    context.fetch = async () => ({status:409,ok:false,json:async()=>({detail:'Changed in another tab'})});
+    assert.equal(await run('saveCurrentConversation()'),false);
+    assert.equal(get('save-chat-copy').hidden,false);
+    context.fetch = async (url, options) => {
+        assert.equal(url,'https://api.example/conversations');
+        assert.equal(options.method,'POST');
+        return {status:201,ok:true,json:async()=>({conversation:{id:'copy',revision:1,title:'Local changes'}})};
+    };
+    assert.equal(await run('saveConversationCopy()'),true);
+    assert.equal(run('currentConversationId'),'copy');
+    assert.equal(run('chatHistory[0].content'),'Local changes');
 });

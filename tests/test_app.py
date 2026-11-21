@@ -13,6 +13,7 @@ import services
 
 USER_A = "11111111-1111-4111-8111-111111111111"
 USER_B = "22222222-2222-4222-8222-222222222222"
+RECORD_A = "33333333-3333-4333-8333-333333333333"
 HEADERS = {"Authorization": "Bearer user-a-token"}
 
 
@@ -49,27 +50,32 @@ def test_auth_required_for_all_history_endpoints(client):
     assert client.get("/profile", headers={"Authorization": "Bearer forged"}).status_code == 401
 
 
-def test_profile_read_and_delete_use_authenticated_owner(client, monkeypatch):
-    read = Mock(return_value={"history": {"allergies": "Penicillin"}})
-    monkeypatch.setattr(services, "get_profile", read)
-    response = client.get("/profile", headers=HEADERS, params={"user_id": USER_B})
+def test_medical_record_read_and_delete_use_authenticated_owner(client, monkeypatch):
+    read = Mock(return_value={"id": RECORD_A, "history": {"allergies": "Penicillin"}})
+    monkeypatch.setattr(services, "owned_row", read)
+    response = client.get("/medical-records/" + RECORD_A, headers=HEADERS, params={"user_id": USER_B})
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
-    read.assert_called_once_with(USER_A, "user-a-token")
+    from uuid import UUID
+    read.assert_called_once_with("medical_records", UUID(RECORD_A), USER_A, "user-a-token")
     delete = Mock(return_value=None)
     monkeypatch.setattr(services, "supabase_request", delete)
-    assert client.delete("/profile", headers=HEADERS).status_code == 204
-    assert delete.call_args.kwargs["params"]["user_id"] == "eq." + USER_A
+    assert client.delete("/medical-records/" + RECORD_A, headers=HEADERS).status_code == 204
+    for call in delete.call_args_list:
+        assert call.kwargs["params"]["user_id"] == "eq." + USER_A
+    assert delete.call_args_list[0].kwargs['json'] == {'medical_record_id': None, 'use_history': False}
 
 
-def test_profile_cannot_spoof_owner_or_extra_fields(client, monkeypatch):
-    write = Mock(return_value=[{"history": {"conditions": "Asthma"}, "updated_at": "2026-11-17"}])
+def test_medical_record_cannot_spoof_owner_or_extra_fields(client, monkeypatch):
+    write = Mock(return_value=[{"id": RECORD_A, "name": "General history", "history": {"conditions": "Asthma"}}])
     monkeypatch.setattr(services, "supabase_request", write)
-    assert client.put("/profile", headers=HEADERS, json={"user_id": USER_B, "history": {}}).status_code == 422
-    assert client.put("/profile", headers=HEADERS, json={"history": {"user_id": USER_B}}).status_code == 422
-    assert client.put("/profile", headers=HEADERS, json={"history": {"allergies": "a" * 2001}}).status_code == 422
-    response = client.put("/profile", headers=HEADERS, json={"history": {"conditions": "Asthma"}})
-    assert response.status_code == 200
+    base = {"name": "General history", "history": {}}
+    assert client.post("/medical-records", headers=HEADERS, json={**base, "user_id": USER_B}).status_code == 422
+    assert client.post("/medical-records", headers=HEADERS, json={**base, "history": {"user_id": USER_B}}).status_code == 422
+    assert client.post("/medical-records", headers=HEADERS, json={**base, "history": {"allergies": "a" * 2001}}).status_code == 422
+    assert client.post("/medical-records", headers=HEADERS, json={**base, "name": "   "}).status_code == 422
+    response = client.post("/medical-records", headers=HEADERS, json={**base, "history": {"conditions": "Asthma"}})
+    assert response.status_code == 201
     assert write.call_args.kwargs["json"]["user_id"] == USER_A
     assert write.call_args.args[2] == "user-a-token"
 
@@ -96,7 +102,7 @@ def test_private_provider_errors_are_not_exposed(client, monkeypatch):
 
 def test_chat_profile_opt_in_and_role_validation(client, monkeypatch):
     profile = Mock(return_value={"history": {"allergies": "Penicillin"}})
-    monkeypatch.setattr(services, "get_profile", profile)
+    monkeypatch.setattr(services, "owned_row", profile)
     store = Mock()
     store.similarity_search.return_value = [SimpleNamespace(page_content="Reference passage")]
     monkeypatch.setattr(services, "get_vector_store", lambda: store)
@@ -107,6 +113,7 @@ def test_chat_profile_opt_in_and_role_validation(client, monkeypatch):
     assert client.post("/chat", json=payload, headers=HEADERS).status_code == 200
     profile.assert_not_called()
     assert "Penicillin" not in groq.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    payload["medical_record_id"] = RECORD_A
     payload["use_history"] = True
     assert client.post("/chat", json=payload).status_code == 401
     result = client.post("/chat", json=payload, headers=HEADERS)
@@ -193,7 +200,7 @@ def test_doctor_matching_prioritizes_current_symptoms_over_history():
 
 def test_chat_proactively_matches_symptoms_and_only_consented_history(client, monkeypatch):
     profile = Mock(return_value={"history": {"conditions": "hypertension"}})
-    monkeypatch.setattr(services, "get_profile", profile)
+    monkeypatch.setattr(services, "owned_row", profile)
     store = Mock()
     store.similarity_search.return_value = []
     monkeypatch.setattr(services, "get_vector_store", lambda: store)
@@ -207,12 +214,14 @@ def test_chat_proactively_matches_symptoms_and_only_consented_history(client, mo
     assert not response.json()["used_history"]
     profile.assert_not_called()
     assert "hypertension" not in groq.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    payload["medical_record_id"] = RECORD_A
     payload["use_history"] = True
     response = client.post('/chat', headers=HEADERS, json=payload)
     assert response.json()["used_history"]
     assert response.json()["doctors"][0]["specialty"] == "Neurology"
     assert any("shared history" in doctor["match_reason"] for doctor in response.json()["doctors"])
-    profile.assert_called_once_with(USER_A, "user-a-token")
+    from uuid import UUID
+    profile.assert_called_once_with("medical_records", UUID(RECORD_A), USER_A, "user-a-token")
     # Follow-up timing details retain symptom context from the user, not the assistant.
     payload = {"messages": [
         {"role": "user", "content": "I have a headache"},
@@ -253,3 +262,83 @@ def test_chat_and_photo_use_one_model_setting(client, monkeypatch, configured_mo
     prompt = chat_options['messages'][0]['content']
     assert 'Do not duplicate those details in Markdown tables' in prompt
     assert 'If asked about authenticity, explain honestly' in prompt
+
+
+@pytest.mark.parametrize('path,method', [('/medical-records','get'),('/medical-records','post'),('/conversations','get'),('/conversations','post'),('/conversations/'+RECORD_A,'get'),('/conversations/'+RECORD_A,'delete')])
+def test_new_storage_routes_require_login(client, path, method):
+    kwargs = {'json': {'name':'History','history':{}}} if method == 'post' and 'medical-records' in path else ({'json': {}} if method == 'post' else {})
+    assert getattr(client, method)(path, **kwargs).status_code == 401
+
+
+def test_chat_uses_only_selected_record_and_checks_owner(client, monkeypatch):
+    fetch = Mock(side_effect=main.HTTPException(404, 'Not found'))
+    monkeypatch.setattr(services, 'owned_row', fetch)
+    payload = {'messages':[{'role':'user','content':'Help with headaches'}], 'use_history':True}
+    assert client.post('/chat',headers=HEADERS,json=payload).status_code == 422
+    fetch.assert_not_called()
+    payload['medical_record_id'] = RECORD_A
+    assert client.post('/chat',headers=HEADERS,json=payload).status_code == 404
+    from uuid import UUID
+    fetch.assert_called_once_with('medical_records',UUID(RECORD_A),USER_A,'user-a-token')
+
+
+def test_conversation_titles_are_short_and_derived_without_inference():
+    from schemas import SavedMessage
+    def title(text): return main.short_chat_title([SavedMessage(role='user',content=text)])
+    assert title('I have recurring headaches. Who could I consult?') == 'Recurring headaches'
+    assert title('Please help me understand symptoms of diabetes') == 'Symptoms of diabetes'
+    assert title('What are the symptoms of asthma?') == 'Symptoms of asthma'
+    assert title('???') == 'New chat'
+    assert len(title('x'*100)) <= 60
+    assert title('Find a doctor for migraines') == 'Doctor for migraines'
+
+
+def test_conversation_create_and_update_validate_owner_selection_and_revision(client, monkeypatch):
+    owned = Mock(return_value={'history':{'conditions':'Asthma'}})
+    monkeypatch.setattr(services,'owned_row',owned)
+    write = Mock(return_value=[{'id':RECORD_A,'revision':1,'title':'Headaches'}])
+    monkeypatch.setattr(services,'supabase_request',write)
+    body = {'messages':[{'role':'user','content':'I have headaches. What next?'}], 'medical_record_id':RECORD_A,'use_history':True}
+    result = client.post('/conversations',headers=HEADERS,json=body)
+    assert result.status_code == 201
+    saved = write.call_args.kwargs['json']
+    assert saved['title'] == 'Headaches'
+    assert saved['user_id'] == USER_A
+    assert saved['medical_record_id'] == RECORD_A
+    assert client.post('/conversations',headers=HEADERS,json={**body,'title':'Injected title'}).status_code == 422
+    assert client.post('/conversations',headers=HEADERS,json={**body,'user_id':USER_B}).status_code == 422
+    assert client.post('/conversations',headers=HEADERS,json={**body,'medical_record_id':None}).status_code == 422
+    write.return_value = []
+    result = client.put('/conversations/'+RECORD_A,headers=HEADERS,json={**body,'revision':7})
+    assert result.status_code == 409
+    assert write.call_args.kwargs['params'] == {'id':'eq.'+RECORD_A,'user_id':'eq.'+USER_A,'revision':'eq.7'}
+    assert write.call_args.kwargs['json']['revision'] == 8
+
+
+def test_conversation_listing_paginates_without_returning_messages(client, monkeypatch):
+    query = Mock(return_value=[{'id':str(i)} for i in range(3)])
+    monkeypatch.setattr(services,'supabase_request',query)
+    result = client.get('/conversations?limit=2&offset=4',headers=HEADERS)
+    assert result.json() == {'conversations':[{'id':'0'},{'id':'1'}],'has_more':True}
+    params = query.call_args.kwargs['params']
+    assert params['user_id'] == 'eq.'+USER_A
+    assert 'messages' not in params['select']
+    assert params['limit'] == '3' and params['offset'] == '4'
+    assert result.headers['cache-control'] == 'no-store'
+
+
+def test_conversation_restores_catalog_cards_and_delete_is_owner_scoped(client, monkeypatch):
+    from uuid import UUID
+    owned = Mock(return_value={'id':RECORD_A,'messages':[{'role':'assistant','content':'Explore these profiles.',
+        'doctor_matches':[{'id':'demo-02','reason':'Current headache'},{'id':'unknown','reason':'Forged'}]}]})
+    monkeypatch.setattr(services,'owned_row',owned)
+    result = client.get('/conversations/'+RECORD_A,headers=HEADERS)
+    assert result.status_code == 200
+    doctors = result.json()['conversation']['messages'][0]['doctors']
+    assert len(doctors) == 1
+    assert doctors[0]['id'] == 'demo-02' and doctors[0]['match_reason'] == 'Current headache'
+    owned.assert_called_with('conversations',UUID(RECORD_A),USER_A,'user-a-token')
+    remove = Mock(return_value=None)
+    monkeypatch.setattr(services,'supabase_request',remove)
+    assert client.delete('/conversations/'+RECORD_A,headers=HEADERS).status_code == 204
+    assert remove.call_args.kwargs['params'] == {'id':'eq.'+RECORD_A,'user_id':'eq.'+USER_A}

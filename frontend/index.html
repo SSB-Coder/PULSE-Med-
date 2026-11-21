@@ -22,16 +22,28 @@
 
             <div class="sidebar-section">
                 <p class="sidebar-label">Session</p>
-                <button class="sidebar-action-btn reset" onclick="resetChat()">
-                    <span class="btn-icon">↺</span> Reset Conversation
+                <button class="sidebar-action-btn reset" onclick="newChat()">
+                    <span class="btn-icon">↺</span> New chat
                 </button>
             </div>
 
+            <section class="sidebar-section conversation-section" aria-labelledby="conversations-label">
+                <p class="sidebar-label" id="conversations-label">Chat history</p>
+                <p id="conversation-status" class="small-text" role="status">Guest chats last for this visit. Log in to save them.</p>
+                <button id="save-chat-copy" class="sidebar-action-btn" type="button" hidden>Save as a separate chat</button>
+                <button id="retry-chat-save" class="sidebar-action-btn" type="button" hidden>Retry saving chat</button>
+                <div id="conversation-list" class="conversation-list"></div>
+                <button id="more-chats-btn" class="sidebar-action-btn" type="button" hidden>Load older chats</button>
+            </section>
             <div class="sidebar-section account-section">
                 <p class="sidebar-label">Your account</p>
                 <p id="account-status" class="small-text" role="status">Checking sign-in configuration…</p>
                 <button id="login-btn" class="sidebar-action-btn" type="button">Log in / Create account</button>
                 <button id="history-btn" class="sidebar-action-btn" type="button" hidden>Medical history</button>
+                <label id="record-select-label" class="small-text" hidden>Main medical history for this chat
+                    <select id="chat-record-select"><option value="">No record selected</option></select>
+                    <span class="history-context-help">Changing the record affects future replies. Earlier messages stay in this chat.</span>
+                </label>
                 <label id="history-toggle-label" class="small-text" hidden>
                     <input id="use-history" type="checkbox"> Use saved history for replies and doctor matches (shares it with Groq)
                 </label>
@@ -56,10 +68,11 @@
                 <div class="topbar-title">
                     <span class="pulse-dot"></span>
                     PULSE Medical Assistant
+                    <span id="active-chat-title" class="active-chat-title">New chat</span>
                 </div>
                 <div class="topbar-actions">
                     <span id="session-badge" class="session-badge">Guest session</span>
-                    <button class="icon-btn reset-top-btn" onclick="resetChat()" title="Reset chat">↺</button>
+                    <button class="icon-btn reset-top-btn" onclick="newChat()" title="New chat">↺</button>
                 </div>
             </header>
 
@@ -145,8 +158,15 @@
             <button type="button" data-close="history-dialog" aria-label="Close medical history">✕</button>
         </div>
         <p class="small-text">Optional, user-reported information. Skip any field. You can edit or delete this later.
-            Saving stores text in your Supabase account. Enable the saved-history option in the sidebar to share it with Groq for replies and doctor suggestions.</p>
+            Give each record a name and add typed history or reviewed photo text. Select one main record per chat in the sidebar, then enable sharing with Groq for replies and doctor suggestions.</p>
+        <div class="records-toolbar">
+            <h3>Saved records</h3>
+            <button id="new-record-btn" type="button">+ Add medical history</button>
+        </div>
+        <div id="medical-record-list" class="medical-record-list" aria-label="Saved medical histories"></div>
         <form id="history-form">
+            <label>Record name<input id="record-name" type="text" maxlength="100" required placeholder="e.g. General history or November checkup"></label>
+            <p class="small-text" id="record-editor-description">Create a separate record for each report or history you want to keep.</p>
             <div class="history-grid">
                 <label>Conditions<textarea name="conditions" maxlength="3000" placeholder="e.g. asthma, diagnosed in 2020"></textarea></label>
                 <label>Current medications<textarea name="medications" maxlength="3000" placeholder="Names, doses, and frequency if known"></textarea></label>
@@ -173,16 +193,25 @@
             </section>
             <p id="history-status" class="form-status" role="status" aria-live="polite"></p>
             <div class="dialog-actions">
-                <button id="delete-history-btn" type="button" class="danger-button">Delete saved history</button>
+                <button id="delete-history-btn" type="button" class="danger-button">Delete this record</button>
                 <button type="button" data-close="history-dialog">Skip / close</button>
                 <button id="save-history-btn" type="submit" class="primary-button">Save history</button>
             </div>
             <div id="delete-confirm" hidden>
-                <p>Delete your saved medical-history form? Your login account will remain.</p>
+                <p>Delete this medical-history record? Chats will remain, but this record will no longer be available to them. Past messages may still contain details discussed from this record.</p>
                 <button id="confirm-delete-btn" type="button" class="danger-button">Yes, delete history</button>
                 <button id="cancel-delete-btn" type="button">Cancel</button>
             </div>
         </form>
+    </dialog>
+    <dialog id="delete-chat-dialog" aria-labelledby="delete-chat-title">
+        <div class="dialog-heading"><h2 id="delete-chat-title">Delete this chat?</h2></div>
+        <p>This permanently removes the saved conversation. Medical-history records are kept.</p>
+        <p id="delete-chat-status" class="form-status" role="status"></p>
+        <div class="dialog-actions">
+            <button type="button" data-close="delete-chat-dialog">Cancel</button>
+            <button id="confirm-delete-chat" type="button" class="danger-button">Delete chat</button>
+        </div>
     </dialog>
     <dialog id="doctors-dialog" aria-labelledby="doctors-title">
         <div class="dialog-heading">
