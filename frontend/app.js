@@ -33,6 +33,8 @@ let chatDirty = false;
 let chatMutation = 0;
 let guestChatCounter = 0;
 let pendingDeleteChatId = null;
+let webAvailable = false;
+let webAvailabilityLoaded = false;
 const $ = (id) => document.getElementById(id);
 
 function updateChatContext() {
@@ -262,7 +264,8 @@ async function loadConversations(append = false) {
 function storedMessages() {
     return chatHistory.map((message) => ({
         role: message.role, content: message.content,
-        doctor_matches: message.doctor_matches || [], used_history: Boolean(message.used_history)
+        doctor_matches: message.doctor_matches || [], used_history: Boolean(message.used_history),
+        web_sources: message.web_sources || [], web_status: message.web_status || 'off', web_notice: message.web_notice || ''
     }));
 }
 
@@ -277,7 +280,7 @@ async function saveCurrentConversation() {
         if (!chatDirty) return true;
         const mutation = chatMutation;
         const payload = { messages: storedMessages(), medical_record_id: selectedRecordId,
-            use_history: Boolean(session && selectedRecordId && $('use-history').checked), revision: conversationRevision };
+            use_history: Boolean(session && selectedRecordId && $('use-history').checked), revision: conversationRevision, web_enabled: Boolean(session && $('use-web').checked) };
         if (!session) {
             const id = currentConversationId || 'guest-' + (++guestChatCounter);
             const conversation = { id, title: shortChatTitle(chatHistory), ...payload, messages: [...chatHistory] };
@@ -368,11 +371,16 @@ async function openConversation(id) {
         conversationRevision = conversation.revision || 1;
         selectedRecordId = medicalRecords.some((record) => record.id === conversation.medical_record_id) ? conversation.medical_record_id : null;
         $('use-history').checked = Boolean(session && selectedRecordId && conversation.use_history);
+        $('use-web').checked = Boolean(session && conversation.web_enabled);
+        updateWebControls();
         chatHistory = conversation.messages || [];
         $('chat-box').replaceChildren();
         chatHistory.forEach((message) => {
             appendMessage(message.role, message.content, $('chat-box'));
-            if (message.role === 'assistant') renderDoctorCards(message.doctors, message.used_history);
+            if (message.role === 'assistant') {
+                renderWebSources(message.web_sources, message.web_status, message.web_notice);
+                renderDoctorCards(message.doctors, message.used_history);
+            }
         });
         $('active-chat-title').textContent = conversation.title;
         renderRecordChoices(); renderConversationList(); updateChatContext();
@@ -433,6 +441,7 @@ function applySession(nextSession) {
     $('history-btn').hidden = !signedIn;
     $('history-toggle-label').hidden = !signedIn;
     $('record-select-label').hidden = !signedIn;
+    $('web-options').hidden = !signedIn;
     $('account-status').textContent = signedIn ? `Signed in as ${session.user.email || 'your account'}` : 'Sign in to save your optional medical history.';
     if (previousId !== session?.user.id) {
         accountEpoch++;
@@ -470,6 +479,7 @@ function applySession(nextSession) {
         if (signedIn && !recoveringPassword) { void loadHistory(true); void loadConversations(); }
     }
     updateChatContext();
+    updateWebControls();
 }
 
 function authRedirect(recovery = false) {
@@ -805,6 +815,10 @@ function resetChat() {
     conversationRevision = 1;
     selectedRecordId = null;
     $('use-history').checked = false;
+    $('use-web').checked = false;
+    $('web-query').value = '';
+    $('web-consent').checked = false;
+    updateWebControls();
     $('retry-chat-save').hidden = true;
     $('save-chat-copy').hidden = true;
     $('active-chat-title').textContent = 'New chat';
@@ -836,6 +850,13 @@ async function sendbtn() {
     const userMessage = $('user-input').value.trim();
     if (!userMessage) return;
     if (userMessage.length > 8000) { $('user-input').setCustomValidity('Keep your message under 8,000 characters.'); $('user-input').reportValidity(); return; }
+    const webEnabled = Boolean(session && webAvailable && $('use-web').checked);
+    const publicQuery = $('web-query').value.trim();
+    if (webEnabled && (!publicQuery || !$('web-consent').checked)) {
+        $('web-availability').textContent = 'Enter generic public terms and approve them for this reply, or turn web search off.';
+        $('web-query').focus();
+        return;
+    }
     $('welcome-screen')?.remove();
     appendMessage('user', userMessage, $('chat-box'));
     chatHistory.push({ role: 'user', content: userMessage });
@@ -845,21 +866,28 @@ async function sendbtn() {
     const epoch = chatEpoch;
     const typing = showTyping($('chat-box'));
     isLoading = true;
+    if (webEnabled) {
+        $('web-query').value = '';
+        $('web-consent').checked = false;
+        $('web-availability').textContent = 'Checking references and approved public sources…';
+    }
     setSendState(true);
     try {
         await saveCurrentConversation();
         if (epoch !== chatEpoch) return;
         const data = await api('/chat', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages: chatHistory.slice(-39).map(({role, content}) => ({role, content: content.slice(0, 8000)})), use_history: Boolean(session && selectedRecordId && $('use-history').checked), medical_record_id: selectedRecordId })
+            body: JSON.stringify({ messages: chatHistory.slice(-39).map(({role, content}) => ({role, content: content.slice(0, 8000)})), use_history: Boolean(session && selectedRecordId && $('use-history').checked), medical_record_id: selectedRecordId, web_enabled: webEnabled, web_query: webEnabled ? publicQuery : '', web_query_consent: webEnabled })
         });
         if (epoch !== chatEpoch) return;
         typing.remove();
         appendMessage('assistant', data.reply, $('chat-box'));
         chatHistory.push({ role: 'assistant', content: data.reply,
             doctor_matches: (data.doctors || []).map((doctor) => ({id: doctor.id, reason: doctor.match_reason || ''})),
-            used_history: Boolean(data.used_history), doctors: data.doctors || [] });
+            used_history: Boolean(data.used_history), doctors: data.doctors || [],
+            web_sources: data.web_sources || [], web_status: data.web_status || 'off', web_notice: data.web_notice || '' });
         chatDirty = true; chatMutation++;
+        renderWebSources(data.web_sources, data.web_status, data.web_notice);
         renderDoctorCards(data.doctors, data.used_history);
         await saveCurrentConversation();
     } catch (error) {
@@ -875,7 +903,14 @@ async function sendbtn() {
 function appendMessage(role, content, chatBox) {
     const div = document.createElement('div'); div.className = `message ${role}`;
     if (role === 'assistant' && window.marked && window.DOMPurify) {
-        div.innerHTML = DOMPurify.sanitize(marked.parse(content));
+        div.innerHTML = DOMPurify.sanitize(marked.parse(content), {
+            ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 's', 'del', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr', 'a'],
+            ALLOWED_ATTR: ['href', 'title', 'align', 'colspan', 'rowspan', 'scope'],
+            FORBID_TAGS: ['img', 'video', 'audio', 'source', 'iframe', 'form', 'input', 'style', 'svg', 'math'],
+            FORBID_ATTR: ['style', 'srcset', 'ping']
+        });
+        // Prevent model-supplied tracking/resource URLs. Only validated source-panel links navigate.
+        div.querySelectorAll('a').forEach((link) => link.replaceWith(link.textContent));
         // Preserve readable columns on narrow screens without overflowing the chat.
         div.querySelectorAll('table').forEach((table) => {
             const wrapper = document.createElement('div');
@@ -899,12 +934,70 @@ function setSendState(loading) {
     document.querySelector('.send-btn').disabled = loading;
     $('chat-record-select').disabled = loading;
     $('use-history').disabled = loading;
+    updateWebControls(loading);
     renderRecordChoices();
 }
 
 
+function updateWebControls(busy = isLoading || conversationOpening) {
+    $('web-options').hidden = !session;
+    $('use-web').disabled = busy || !session || !webAvailable;
+    $('web-query-panel').hidden = !$('use-web').checked || !webAvailable;
+    $('web-query').disabled = busy;
+    $('web-consent').disabled = busy;
+    if (!busy) $('web-availability').textContent = !webAvailabilityLoaded ? 'Checking availability…'
+        : !webAvailable ? 'Public web search is unavailable. Ordinary chat still works.'
+        : $('use-web').checked ? 'Approve public search terms separately for each reply. Private history is not sent to search.'
+        : 'Web search is off. Replies use available reference context.';
+}
+
+async function loadWebStatus() {
+    try {
+        const data = await api('/web/status');
+        webAvailable = data.available === true;
+    } catch { webAvailable = false; }
+    webAvailabilityLoaded = true;
+    updateWebControls();
+}
+
+function renderWebSources(sources = [], status = 'off', notice = '') {
+    if (status === 'off' && !sources.length) return;
+    const panel = document.createElement('section'); panel.className = 'web-sources';
+    panel.setAttribute('aria-label', 'Web evidence for the preceding response');
+    const heading = document.createElement('h3'); heading.textContent = sources.length ? 'Public sources' : 'Web search status';
+    const text = document.createElement('p'); text.className = 'small-text'; text.textContent = notice;
+    panel.append(heading, text);
+    const domains = ['nhs.uk', 'medlineplus.gov', 'cdc.gov', 'nih.gov', 'who.int', 'mohfw.gov.in', 'icmr.gov.in', 'fda.gov'];
+    sources.slice(0, 3).forEach((source) => {
+        let url;
+        try {
+            url = new URL(source.url);
+            if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443') ||
+                !domains.some((host) => url.hostname === host || url.hostname.endsWith('.' + host))) return;
+        } catch { return; }
+        const item = document.createElement('div'); item.className = 'web-source';
+        const link = document.createElement('a'); link.href = url.href; link.target = '_blank';
+        link.rel = 'noopener noreferrer'; link.referrerPolicy = 'no-referrer';
+        link.textContent = `[${source.id}] ${source.title}`;
+        const details = document.createElement('p'); details.className = 'small-text';
+        const retrieved = new Date(source.retrieved_at);
+        details.textContent = `${url.hostname} · ${source.cited ? 'Cited in reply' : 'Consulted; not cited'} · ` +
+            (source.published_at ? `Published ${source.published_at} · ` : 'Publication date unavailable · ') +
+            (Number.isNaN(retrieved.getTime()) ? 'Retrieval date unavailable' : `Read ${retrieved.toLocaleString()}`);
+        item.append(link, details); panel.appendChild(item);
+    });
+    $('chat-box').appendChild(panel);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     setEntryScreen(true);
+    void loadWebStatus();
+    $('use-web').addEventListener('change', () => {
+        $('web-query').value = ''; $('web-consent').checked = false;
+        updateWebControls();
+        if (chatHistory.length) { chatDirty = true; chatMutation++; void saveCurrentConversation(); }
+    });
+    $('web-query').addEventListener('input', () => { $('web-consent').checked = false; });
     $('guest-btn').addEventListener('click', continueAsGuest);
     $('auth-dialog').addEventListener('cancel', (event) => {
         if (entryScreen) event.preventDefault();

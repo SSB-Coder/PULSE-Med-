@@ -301,7 +301,7 @@ test('sanitized Markdown tables receive a keyboard-accessible horizontal scroll 
     const baseCreate = context.document.createElement;
     context.document.createElement = () => {
         const element = baseCreate();
-        element.querySelectorAll = () => [table];
+        element.querySelectorAll = (selector) => selector === 'table' ? [table] : [];
         element.attributes = {};
         element.setAttribute = (key, value) => { element.attributes[key] = value; };
         return element;
@@ -497,4 +497,89 @@ test('conflicting saves can be kept as a separate chat without overwriting the r
     assert.equal(await run('saveConversationCopy()'),true);
     assert.equal(run('currentConversationId'),'copy');
     assert.equal(run('chatHistory[0].content'),'Local changes');
+});
+
+test('web terms require separate per-turn consent and never copy private history into the search query', async () => {
+    const { context,get,run } = setup();
+    const calls=[];
+    context.fetch = async (url, options={}) => {
+        calls.push({url,options});
+        const body = options.body ? JSON.parse(options.body) : {};
+        const data = url.endsWith('/chat') ? {reply:'A cautious answer',doctors:[],web_sources:[],web_status:'not_used',web_notice:'No page read.'}
+            : {conversation:{id:'chat-a',title:'Headache',revision:1,...body}};
+        return {status:200,ok:true,json:async()=>data};
+    };
+    run("session={access_token:'token',user:{id:'user'}}; webAvailable=true; webAvailabilityLoaded=true; medicalRecords=[{id:'record-a',name:'Private history'}]; selectedRecordId='record-a'");
+    get('use-web').checked=true; get('use-history').checked=true;
+    get('history-form').elements.notes.value='Private patient name and record details';
+    get('user-input').value='I have a headache';
+    await run('sendbtn()');
+    assert.equal(calls.length,0);
+    get('web-query').value='migraine guidance';
+    await run('sendbtn()');
+    assert.equal(calls.length,0);
+    get('web-consent').checked=true;
+    await run('sendbtn()');
+    const request=calls.find(call=>call.url.endsWith('/chat'));
+    const body=JSON.parse(request.options.body);
+    assert.equal(body.web_query,'migraine guidance');
+    assert.equal(body.web_query_consent,true);
+    assert.equal(body.medical_record_id,'record-a');
+    assert.equal(get('web-query').value,'');
+    assert.equal(get('web-consent').checked,false);
+    const saved=JSON.parse(calls[0].options.body);
+    assert.equal(saved.web_enabled,true);
+    assert.equal('web_query' in saved,false,'Public query/approval must not be saved as a persistent permission');
+    get('user-input').value='Another question';
+    const count=calls.length;
+    await run('sendbtn()');
+    assert.equal(calls.length,count,'Each subsequent reply needs fresh public terms and consent');
+});
+
+test('web source rendering rejects arbitrary URLs and labels consulted pages honestly', () => {
+    const {get,run}=setup();
+    run("renderWebSources([{id:'W1',title:'Public guidance',url:'https://www.nhs.uk/topic',retrieved_at:'2026-11-22T10:00:00Z',published_at:null,cited:false},{id:'W2',title:'Bad',url:'https://evil.test/',retrieved_at:'2026-11-22T10:00:00Z'}], 'limited', 'Limited evidence')");
+    const panel=get('chat-box').children[0];
+    assert.equal(panel.children.length,3); // Heading, notice, and only the approved source.
+    const source=panel.children[2];
+    assert.equal(source.children[0].href,'https://www.nhs.uk/topic');
+    assert.equal(source.children[0].rel,'noopener noreferrer');
+    assert.match(source.children[1].textContent,/Consulted; not cited/);
+    assert.match(source.children[1].textContent,/Publication date unavailable/);
+});
+
+test('saved citations and the web-mode preference restore, while query approval does not', async () => {
+    const {context,get,run}=setup();
+    const source={id:'W1',url:'https://www.nhs.uk/topic',title:'Guidance',retrieved_at:'2026-11-22T10:00:00Z',published_at:'2026-01-01',content_hash:'a'.repeat(64),cited:true};
+    context.fetch=async(url)=>({status:200,ok:true,json:async()=>url.endsWith('/medical-records')?{records:[]}:
+        {conversation:{id:'chat-web',title:'Headache',revision:2,web_enabled:true,messages:[{role:'assistant',content:'Possible causes [W1]',web_sources:[source],web_status:'used',web_notice:'Sources read.'}]}}});
+    run("session={access_token:'token',user:{id:'user'}}; webAvailable=true; webAvailabilityLoaded=true");
+    get('web-query').value='old terms';get('web-consent').checked=true;
+    await run("openConversation('chat-web')");
+    assert.equal(get('use-web').checked,true);
+    assert.equal(get('web-query').value,'');assert.equal(get('web-consent').checked,false);
+    assert.equal(run('storedMessages()[0].web_sources[0].id'),'W1');
+    assert.equal(get('chat-box').children.some(node=>node.className==='web-sources'),true);
+    run('applySession(null)');
+    assert.equal(get('use-web').checked,false);
+    assert.equal(get('web-query').value,'');
+});
+
+test('assistant rendering blocks external resource tags and strips model-supplied hyperlinks', () => {
+    const {context,get,run}=setup();
+    let removed;
+    const link={textContent:'A label',replaceWith(value){removed=value;}};
+    const baseCreate=context.document.createElement;
+    context.document.createElement=()=>{
+        const element=baseCreate();element.querySelectorAll=(selector)=>selector==='a'?[link]:[];return element;
+    };
+    context.window.marked=context.marked={parse:()=>'<a href="https://evil.test">A label</a>'};
+    context.window.DOMPurify=context.DOMPurify={sanitize:(html,policy)=>{
+        assert.ok(policy.FORBID_TAGS.includes('img'));
+        assert.ok(policy.FORBID_TAGS.includes('svg'));
+        assert.ok(policy.FORBID_ATTR.includes('style'));
+        return html;
+    }};
+    run("appendMessage('assistant','malicious markup',$('chat-box'))");
+    assert.equal(removed,'A label');
 });

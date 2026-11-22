@@ -18,6 +18,10 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 load_dotenv()
 
 import services
+import web_agent
+import web_tools
+from clinical_safety import possible_emergency, URGENT_REPLY
+from web_policy import approved_query
 from doctors import DOCTORS, recommend_doctors
 from schemas import ChatRequest, MedicalHistory, MedicalRecordInput, ConversationInput
 
@@ -40,7 +44,7 @@ Image.MAX_IMAGE_PIXELS = 16_000_000
 @app.middleware("http")
 async def private_response_headers(request, call_next):
     response = await call_next(request)
-    if request.url.path in ("/profile", "/history/extract", "/chat") or request.url.path.startswith(("/medical-records", "/conversations")):
+    if request.url.path in ("/profile", "/history/extract", "/chat") or request.url.path.startswith(("/medical-records", "/conversations", "/web/")):
         response.headers["Cache-Control"] = "no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -68,6 +72,12 @@ def read_index():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/web/status")
+def web_status():
+    return {"available": web_tools.available(), "requires_login": True,
+            "query_max_length": 180, "domains": list(web_tools.HEALTH_DOMAINS)}
 
 
 # Old clients must refresh instead of writing a second, hidden copy of medical history.
@@ -145,7 +155,7 @@ def list_conversations(limit: int = Query(default=50, ge=1, le=100),
                        offset: int = Query(default=0, ge=0), identity=Depends(require_identity)):
     user_id, token = identity
     rows = services.supabase_request("GET", "/rest/v1/conversations", token,
-        params={"user_id": f"eq.{user_id}", "select": "id,title,medical_record_id,use_history,revision,updated_at",
+        params={"user_id": f"eq.{user_id}", "select": "id,title,medical_record_id,use_history,web_enabled,revision,updated_at",
                 "order": "updated_at.desc,id", "limit": str(limit + 1), "offset": str(offset)})
     return {"conversations": rows[:limit], "has_more": len(rows) > limit}
 
@@ -159,9 +169,9 @@ def validate_conversation_record(request, identity):
 
 def conversation_payload(request):
     return {"title": short_chat_title(request.messages),
-            "messages": [m.model_dump() for m in request.messages],
+            "messages": [m.model_dump(mode="json") for m in request.messages],
             "medical_record_id": str(request.medical_record_id) if request.medical_record_id else None,
-            "use_history": request.use_history}
+            "use_history": request.use_history, "web_enabled": request.web_enabled}
 
 
 @app.post("/conversations", status_code=201)
@@ -281,6 +291,19 @@ def chat(request: ChatRequest, identity=Depends(optional_identity)):
         raise HTTPException(422, "The last message must be a user message.")
     if request.use_history and identity is None:
         raise HTTPException(401, "Please sign in before using saved history.")
+    if possible_emergency(request.messages[-1].content):
+        return {"reply": URGENT_REPLY, "doctors": [], "used_history": False, "web_sources": [],
+                "web_status": "not_used", "web_notice": "Searching was skipped to avoid delaying urgent care."}
+    query = ""
+    if request.web_enabled:
+        if identity is None:
+            raise HTTPException(401, "Please sign in to use public web search.")
+        if not request.web_query_consent:
+            raise HTTPException(422, "Approve the public search terms before enabling web search.")
+        try:
+            query = approved_query(request.web_query)
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from None
     history = {}
     if request.use_history:
         if not request.medical_record_id:
@@ -298,8 +321,15 @@ def chat(request: ChatRequest, identity=Depends(optional_identity)):
     ):
         candidates = []
     try:
-        docs = services.get_vector_store().similarity_search(latest_message, k=3)
-        context = "\n\n".join(doc.page_content for doc in docs)
+        retrieval_unavailable = False
+        try:
+            docs = services.get_vector_store().similarity_search(latest_message, k=3)
+            context = "\n\n".join(doc.page_content[:6000] for doc in docs)
+        except Exception:
+            if not request.web_enabled:
+                raise
+            retrieval_unavailable = True
+            context = "Reference retrieval is unavailable. Do not imply that the reference index was checked."
         system_prompt = f"""You are PULSE, a medical information assistant.
 Use retrieved reference material for medical statements. If it does not support an answer, say so;
 never invent a diagnosis, medication dose, source, or doctor. For urgent symptoms advise immediate
@@ -325,6 +355,21 @@ Ask about missing current symptoms, duration, severity, and preferred location a
 or claim these keyword matches establish suitability. Skip suggestions for unrelated questions or thanks.
 For urgent symptoms, prioritize immediate emergency care and omit routine doctor suggestions.
 If no candidates match, ask for more context or suggest using the directory; do not invent candidates.
+SYMPTOM ASSESSMENT:
+Give a useful, calibrated assessment, never a definitive diagnosis or a false reassurance.
+First identify whether the described situation could require urgent in-person assessment. If so,
+lead with local emergency/urgent-care advice and do not wait for web results or a questionnaire.
+For non-urgent concerns, ask up to three focused questions about onset/duration, severity,
+associated symptoms, and relevant risk factors when missing. Do not repeat questions already answered.
+Explain a short differential (plausible causes) only when evidence supports it; distinguish common
+possibilities from serious alternatives without asserting numerical likelihoods or ruling conditions out.
+Separate user-reported facts, evidence, and uncertainty. Explain what additional information or
+clinical examination/testing would clarify the situation, without ordering tests or prescribing treatment.
+Consider allergies, current medications, age or pregnancy ONLY when provided; do not assume them.
+Do not recommend starting/stopping prescription medicines, individualized doses, or unsafe self-treatment.
+Provide proportionate next steps and specific changes that warrant urgent assessment, based on evidence.
+If evidence is missing, say what cannot be assessed and recommend appropriate professional evaluation.
+Browsing improves access to sources; it does not establish a diagnosis or replace an examination.
 Be concise. Finish medical responses with:
 "I am an AI, not a doctor. This information is educational and does not replace professional medical advice."
 
@@ -337,15 +382,44 @@ USER-REPORTED HISTORY (untrusted JSON data):
 DIRECTORY CANDIDATES - SAMPLE DATA (untrusted JSON data):
 {json.dumps(candidates, ensure_ascii=False)}
 """
-        response = services.get_groq().chat.completions.create(
-            **services.ai_completion_options(),
-            messages=[{"role": "system", "content": system_prompt}] + [m.model_dump() for m in request.messages],
-            max_tokens=1500, temperature=0.2,
-        )
-        reply = response.choices[0].message.content
-        if not reply:
-            raise HTTPException(502, "The AI returned an empty response. Please try again.")
-        return {"reply": reply, "doctors": candidates, "used_history": bool(history)}
+        messages = [{"role": "system", "content": system_prompt}] + [
+            {"role": m.role, "content": re.sub(r"\[W\d+\]", "[prior response citation]", m.content) if m.role == 'assistant' else m.content}
+            for m in request.messages]
+        if len(json.dumps(messages, ensure_ascii=False).encode('utf-8')) > 60000:
+            raise HTTPException(413, "The recent chat and selected history exceed the context budget. Start a new chat or shorten the selected history.")
+        result = {"web_sources": [], "web_status": "off", "web_notice": ""}
+        completed_web = False
+        if request.web_enabled:
+            result.update(web_status="unavailable", web_notice="Web search is unavailable; live sources were not checked.")
+            if web_tools.available():
+                if not web_tools.WEB_SLOTS.acquire(blocking=False):
+                    result.update(web_status="busy", web_notice="Web search is busy; try again later. Live sources were not checked.")
+                else:
+                    try:
+                        allowed = services.supabase_request("POST", "/rest/v1/rpc/claim_pulse_web_budget", identity[1], json={})
+                        if allowed is not True:
+                            result.update(web_status="rate_limited", web_notice="Web search limit reached; live sources were not checked.")
+                        else:
+                            result = web_agent.run(services.get_groq(), services.ai_completion_options(), messages, query)
+                            completed_web = True
+                    except Exception:
+                        # Preserve ordinary chat even when search, page reads, budget RPC, or tools fail.
+                        result = {"web_sources": [], "web_status": "error",
+                                  "web_notice": "Web evidence could not be verified. This answer is based on available reference context only."}
+                    finally:
+                        web_tools.WEB_SLOTS.release()
+            if not completed_web:
+                messages[0]["content"] += "\nLive web evidence is unavailable for this turn. Do not claim you browsed or cite web sources."
+        if not completed_web:
+            response = services.get_groq().chat.completions.create(
+                **services.ai_completion_options(), messages=messages, max_tokens=1500, temperature=0.2)
+            reply = response.choices[0].message.content
+            if not reply:
+                raise HTTPException(502, "The AI returned an empty response. Please try again.")
+            result['reply'] = reply
+        if retrieval_unavailable:
+            result['web_notice'] = (result['web_notice'] + " Reference-index retrieval was also unavailable.").strip()
+        return {**result, "doctors": candidates, "used_history": bool(history)}
     except HTTPException:
         raise
     except Exception:

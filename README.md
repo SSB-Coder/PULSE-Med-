@@ -22,6 +22,8 @@ cloud accounts, database migration, credentials, and deployment still require se
 ## Features
 
 - **Reference-based chat:** retrieve medical passages from the existing Pinecone index.
+- **Optional web evidence:** Qwen can request bounded search and public-page tools. Signed-in users approve exact generic search terms per reply. Only approved health domains can be read, with citations and dates saved alongside answers.
+- **Symptom assessment:** focused follow-up questions, evidence-qualified possible causes, uncertainty, and appropriate next steps. A limited explicit red-flag interrupt skips web/model delay for a few urgent phrases; it is not a clinical triage classifier.
 - **Account entry:** a full-page login/create-account screen with a Continue as guest option. Existing sessions open the app directly; signing out returns to login.
 - **Email/password login:** registration, login, email confirmation, and password reset through
   Supabase Auth. Supabase stores salted bcrypt hashes; PULSE never persists raw passwords.
@@ -103,6 +105,7 @@ The frontend has no build step and no Node dependency installation is needed for
 
 | Endpoint | Authentication | Behavior |
 | --- | --- | --- |
+| `GET /web/status` | None | Availability and public-source policy, never credentials |
 | `GET /health` | None | Process health; does not probe external services |
 | `POST /chat` | Optional; required for `use_history: true` | Reference-based chat and optional fictional doctor cards |
 | `GET /medical-records` | Required | List named records without their full medical text |
@@ -158,6 +161,7 @@ return HTTP 410 so outdated frontends refresh instead of writing hidden legacy h
 
 Deploy the Dockerfile to the existing HF Space and the `frontend/` directory to Vercel.
 Run `supabase/chat_history_migration.sql` after the original schema before deploying this update.
+For optional web evidence, also run `supabase/web_tools_migration.sql` and enable the keyless web-search feature flag.
 See [SETUP.md](SETUP.md) for environment values and account steps. Never commit `.env` or put
 Groq, Pinecone, user passwords, or Supabase secret keys in browser configuration.
 A Supabase publishable key is intentionally public; database row-level security protects records.
@@ -180,3 +184,58 @@ embedding model at runtime; retrieval initializes lazily on the first chat reque
   Model instructions are not guaranteed enforcement of medical safety.
 
 No license file is currently included.
+
+## Public web tools
+
+`web_policy.py` validates approved generic terms and HTTPS health-source URLs. `web_tools.py`
+implements keyless search and seeded page reads with public-IP connection pinning, TLS hostname
+verification, robots checks, redirect validation, and bounded decoding/extraction. `web_agent.py`
+executes Qwen's tool requests through that whitelist, then returns validated source metadata.
+`clinical_safety.py` contains a conservative small red-flag interruption; a negative match never
+implies safety. The prompt supports symptom assessment and plausible alternatives, not diagnosis.
+
+Web mode is off by default. It requires login, the SQL budget function, and `WEB_TOOLS_ENABLED=true`.
+No additional search API key is needed; Qwen still uses the existing Groq key.
+Each reply requires a newly approved public query. Queries
+are not automatically generated from history, rewritten by the model, or persisted in chats.
+Sources and the web-mode preference are persisted; approval is not. Names can resemble generic
+words, so the query filter is a guardrail, not reliable automatic de-identification: users must
+review their exact public terms. Provider processing follows the selected provider's terms.
+
+Limits: 5 web turns/minute and 50/day per account; 30/minute and 500/day across the project
+(UTC fixed windows, enforced atomically in PostgreSQL). Four active web turns per API process,
+one search operation (at most two public-service requests within 20 seconds), at most three sources, four tool calls, two tool rounds plus a final answer, a
+60-second web budget, 2 MB/page, 5,000 characters and 6,000 UTF-8 bytes/excerpt, and a 100,000-byte
+serialized web context cap. Base prompts have a 60,000-byte cap. Ordinary fallback inference
+has its existing provider timeout/retry policy and can add latency after a web failure.
+
+Pages are public HTTPS text only, from NHS, MedlinePlus, CDC, NIH, WHO, India's MoHFW/ICMR,
+or FDA. This is not a general browser: no logins, clicks, form submissions, script execution,
+paywall bypass, PDFs, or arbitrary URLs. Search result titles are not evidence; sources appear
+only after a usable page read. Unknown citation IDs and model-supplied external links are removed
+from web replies. Citations establish retrieved provenance, not the truth of a medical claim.
+
+Assistant Markdown rendering also forbids remote image/media/style resources and removes model-supplied hyperlinks. Only server-validated source-panel links navigate outward, preventing unapproved tracking URLs from being loaded as answer images.
+
+### Keyless search providers
+
+PULSE uses the pinned `ddgs==9.16.1` DuckDuckGo result parser. Its default auto/multi-engine
+search and network client are not used: PULSE fetches one public DuckDuckGo result page through
+its own bounded, DNS-pinned transport. Search URLs are fixed by code, not supplied by the model.
+If that service is blocked, has no approved results, or fails, one fallback request searches
+[MedlinePlus.gov health topics](https://medlineplus.gov/about/developers/webservices/) through
+NLM's public keyless XML service. `defusedxml` rejects DTDs/external entities. Only titles and
+approved result URLs are used for discovery; summaries/snippets are not treated as read evidence.
+
+The fallback covers MedlinePlus health topics, not the whole web or news. Its scope is disclosed
+to Qwen and in the saved response notice. Users explicitly approve sending the same generic
+terms to these services; neither receives the private transcript or selected record automatically.
+Use short English topic terms such as `migraine` or `type 2 diabetes`. Terms are not rewritten
+or broadened when falling back. The UI attributes MedlinePlus.gov sources through links and notices;
+no endorsement is implied. Model output and page-reading safeguards are unchanged.
+
+Search engines can block shared hosting IPs or change their HTML. PULSE does not solve CAPTCHAs,
+rotate proxies, retry blocked engines, or bypass publisher controls. If both services are
+unavailable, ordinary reference-based chat continues with an honest web-status notice.
+Any old `BRAVE_SEARCH_API_KEY` setting is unused and can be removed. Existing web SQL tables,
+quotas, and migration still apply; this provider switch requires no additional migration.
