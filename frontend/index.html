@@ -47,17 +47,6 @@
                 <label id="history-toggle-label" class="small-text" hidden>
                     <input id="use-history" type="checkbox"> Use saved history for replies and doctor matches (shares it with Groq)
                 </label>
-                <section id="web-options" class="web-options" aria-labelledby="web-options-title" hidden>
-                    <h3 id="web-options-title">Public web evidence</h3>
-                    <label class="small-text"><input id="use-web" type="checkbox"> Use web search for this chat</label>
-                    <p id="web-availability" class="small-text" role="status">Checking availability…</p>
-                    <div id="web-query-panel" hidden>
-                        <label class="small-text" for="web-query">Public search terms for the next reply</label>
-                        <input id="web-query" type="text" maxlength="180" autocomplete="off" placeholder="e.g. migraine">
-                        <p class="small-text">Use generic health topics only. Do not include names, contact details, dates, record numbers, or your private narrative. Only these terms go to search.</p>
-                        <label class="small-text"><input id="web-consent" type="checkbox"> I approve sending these exact public terms to DuckDuckGo and, if unavailable, MedlinePlus health-topic search, and reading matching public pages for the next reply.</label>
-                    </div>
-                </section>
                 <button id="logout-btn" class="sidebar-action-btn" type="button" hidden>Sign out</button>
                 <button id="doctors-btn" class="sidebar-action-btn" type="button">Explore doctors</button>
             </div>

@@ -25,8 +25,7 @@ test('actual page markup supports multiple medical records and independently res
         const path = new URL(url).pathname;
         const body = options.body ? JSON.parse(options.body) : null;
         let data;
-        if (path === '/web/status') data = {available:true};
-        else if (path === '/medical-records') {
+        if (path === '/medical-records') {
             if (options.method === 'POST') {
                 const record = {id:'record-'+(++counter),...body}; records.unshift(record); data = {record};
             } else data = {records};
@@ -45,10 +44,7 @@ test('actual page markup supports multiple medical records and independently res
             }
             if (options.method === 'PUT') chats.set(id,{...body,id,title:body.messages[0].content.split('.')[0],revision:body.revision+1});
             data = {conversation:chats.get(id)};
-        } else if (path === '/chat') data = {reply:'Tell me more about the symptoms.'+(body.web_enabled?' [W1]':''),doctors:[],used_history:body.use_history,
-            web_status:body.web_enabled?'used':'off',web_notice:body.web_enabled?'Public source read.':'',web_sources:body.web_enabled?[{
-                id:'W1',url:'https://www.nhs.uk/topic',title:'Public guidance',publisher:'www.nhs.uk',retrieved_at:'2026-11-22T10:00:00Z',published_at:null,content_hash:'a'.repeat(64),cited:true
-            }]:[]};
+        } else if (path === '/chat') data = {reply:'Tell me more about the symptoms.',doctors:[],used_history:body.use_history};
         else throw new Error('Unexpected endpoint '+url);
         return {status:200,ok:true,json:async()=>structuredClone(data)};
     };
@@ -80,11 +76,6 @@ test('actual page markup supports multiple medical records and independently res
             $('chat-record-select').dispatchEvent(new w.Event('change'));
             $('use-history').checked = true;
             $('use-history').dispatchEvent(new w.Event('change'));
-            if (question === 'Headache questions') {
-                $('use-web').checked=true; $('use-web').dispatchEvent(new w.Event('change'));
-                $('web-query').value='migraine guidance'; $('web-query').dispatchEvent(new w.Event('input'));
-                $('web-consent').checked=true;
-            }
             $('user-input').value = question;
             await w.eval('sendbtn()');
             assert.equal($('conversation-list').children.length,chats.size);
@@ -98,10 +89,6 @@ test('actual page markup supports multiple medical records and independently res
         assert.equal($('use-history').checked,true);
         assert.equal($('chat-box').querySelectorAll('.message').length,2);
         assert.equal($('active-chat-title').textContent,first.title);
-        assert.equal($('use-web').checked,true);
-        assert.equal($('web-query').value,'');
-        assert.equal($('web-consent').checked,false);
-        assert.equal($('chat-box').querySelectorAll('.web-source a').length,1);
         const active = $('conversation-list').querySelector('[aria-current="true"]');
         active.parentElement.querySelector('.conversation-delete').click();
         assert.equal($('delete-chat-dialog').open,true);
