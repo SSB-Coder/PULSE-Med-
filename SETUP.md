@@ -196,8 +196,8 @@ The flow is:
 
 1. Sign in, open Medical history, and select a photo or use the mobile camera input.
 2. Agree to send it to Groq, then choose **Extract text for review**.
-3. Correct the returned text, especially drug names, doses, dates, units, and `[unclear]` portions.
-4. Choose **Add reviewed text to notes** and then **Save history**.
+3. Compare the suggested fields with the document or the full transcription. Correct doses, dates, units, and `[unclear]` portions.
+4. Choose **Apply reviewed fields** to append the reviewed entries to the matching form fields, then select **Save history**.
 
 The backend checks the image bytes (JPEG/PNG/WebP, up to 5 MB), strips image metadata, and
 sends the normalized image to Groq. PULSE does not persist the original image in Supabase,

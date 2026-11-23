@@ -1,5 +1,6 @@
 """No external credentials, inference, model downloads, or database writes."""
 import io
+import json
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -151,18 +152,25 @@ def test_photo_is_only_transcribed_never_saved(client, monkeypatch, configured_m
     else:
         monkeypatch.setenv("AI_MODEL", configured_model)
     groq = Mock()
-    groq.chat.completions.create.return_value = fake_completion("Medication: [unclear], 5 mg")
+    history = {"medications": "[unclear], 5 mg", "family_history": "Mother has asthma", "allergies": "Penicillin: rash"}
+    transcription = "Medication: [unclear], 5 mg. Mother has asthma. Penicillin: rash."
+    groq.chat.completions.create.return_value = fake_completion(json.dumps({"text": transcription, "history": history}))
     monkeypatch.setattr(services, "get_groq", lambda: groq)
     save = Mock(side_effect=AssertionError("Must not save unreviewed text"))
     monkeypatch.setattr(services, "supabase_request", save)
     response = client.post("/history/extract", headers=HEADERS, data={"consent": "true"},
                            files={"image": ("report.png", image_bytes(), "image/png")})
     assert response.status_code == 200
-    assert response.json() == {"text": "Medication: [unclear], 5 mg", "requires_review": True, "image_stored": False}
+    assert response.json() == {
+        "text": transcription,
+        "history": {"conditions": "", "surgeries": "", "notes": "", **history},
+        "requires_review": True, "image_stored": False
+    }
     assert response.headers["cache-control"] == "no-store"
     save.assert_not_called()
     kwargs = groq.chat.completions.create.call_args.kwargs
     assert kwargs["model"] == (configured_model or "qwen/qwen3.8-27b")
+    assert kwargs["response_format"] == {"type": "json_object"}
     assert kwargs["messages"][1]["content"][1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
     groq.chat.completions.create.return_value = fake_completion("truncated", "length")
     response = client.post("/history/extract", headers=HEADERS, data={"consent": "true"},
@@ -245,7 +253,9 @@ def test_chat_and_photo_use_one_model_setting(client, monkeypatch, configured_mo
     store.similarity_search.return_value = []
     monkeypatch.setattr(services, 'get_vector_store', lambda: store)
     groq = Mock()
-    groq.chat.completions.create.return_value = fake_completion('Readable output')
+    groq.chat.completions.create.side_effect = [
+        fake_completion('Readable output'), fake_completion('{"text":"Readable output","history":{"notes":"Readable output"}}')
+    ]
     monkeypatch.setattr(services, 'get_groq', lambda: groq)
     assert client.post('/chat', json={'messages': [{'role': 'user', 'content': 'I have headaches'}]}).status_code == 200
     chat_options = groq.chat.completions.create.call_args.kwargs
@@ -342,3 +352,18 @@ def test_conversation_restores_catalog_cards_and_delete_is_owner_scoped(client, 
     monkeypatch.setattr(services,'supabase_request',remove)
     assert client.delete('/conversations/'+RECORD_A,headers=HEADERS).status_code == 204
     assert remove.call_args.kwargs['params'] == {'id':'eq.'+RECORD_A,'user_id':'eq.'+USER_A}
+
+
+@pytest.mark.parametrize("response_text", [
+    "plain text instead of JSON",
+    '{"text":"Readable","history":{"medications":["Not text"]}}',
+    '{"text":" ","history":{}}',
+    '{"text":"Readable","history":{"unsupported":"Not a history field"}}',
+])
+def test_photo_rejects_unusable_structured_extraction(client, monkeypatch, response_text):
+    groq = Mock()
+    groq.chat.completions.create.return_value = fake_completion(response_text)
+    monkeypatch.setattr(services, "get_groq", lambda: groq)
+    response = client.post("/history/extract", headers=HEADERS, data={"consent": "true"},
+                           files={"image": ("report.png", image_bytes(), "image/png")})
+    assert response.status_code == 422

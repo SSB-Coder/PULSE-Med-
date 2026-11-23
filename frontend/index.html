@@ -70,7 +70,8 @@
                 </div>
             </header>
 
-            <div id="chat-box" class="chat-box">
+            <div id="chat-box" class="chat-box"></div>
+            <template id="welcome-template">
                 <div class="welcome-screen" id="welcome-screen">
                     <div class="welcome-icon">🩺</div>
                     <h2>Welcome to PULSE</h2>
@@ -82,7 +83,7 @@
                         <button class="chip" onclick="fillInput(this)">Signs of a vitamin D deficiency</button>
                     </div>
                 </div>
-            </div>
+            </template>
 
             <div class="input-area">
                 <p id="chat-context" class="chat-context">Guest mode · Doctor matches use what you share in this conversation.</p>
@@ -168,7 +169,7 @@
                 <label>Surgeries / hospital stays<textarea name="surgeries" maxlength="2000"></textarea></label>
                 <label class="full-width">Relevant family history<textarea name="family_history" maxlength="2000"></textarea></label>
             </div>
-            <label>Additional notes / reviewed document text<textarea name="notes" maxlength="12000" rows="5"></textarea></label>
+            <label>Additional notes<textarea name="notes" maxlength="12000" rows="5"></textarea></label>
             <section class="photo-section" aria-labelledby="photo-title">
                 <h3 id="photo-title">Add history from a photo</h3>
                 <p class="small-text">Photograph a written report or prescription. JPEG, PNG, or WebP, up to 5 MB.
@@ -179,10 +180,14 @@
                 <label class="consent-line"><input id="photo-consent" type="checkbox"> I agree to send this photo to Groq for AI text extraction.</label>
                 <button id="extract-btn" type="button">Extract text for review</button>
                 <div id="extraction-review" hidden>
-                    <label>Check the extracted text carefully<textarea id="extracted-text" rows="7" maxlength="12000"></textarea></label>
-                    <p class="small-text">Correct names, dates, medication doses, units, and anything marked [unclear].
-                        Nothing is saved until you add the reviewed text and select Save history.</p>
-                    <button id="add-extracted-btn" type="button">Add reviewed text to notes</button>
+                    <p class="small-text">Check the suggested fields against the document, especially medication doses, dates, and [unclear] text. Applying adds these entries to the form. Save history stores them.</p>
+                    <details id="transcription-details">
+                        <summary>Read the full transcription</summary>
+                        <pre id="extracted-text" class="extracted-transcription"></pre>
+                    </details>
+                    <div id="extracted-fields" class="history-grid"></div>
+                    <button id="add-extracted-btn" type="button">Apply reviewed fields</button>
+                    <button id="discard-extracted-btn" type="button">Discard suggestions</button>
                 </div>
             </section>
             <p id="history-status" class="form-status" role="status" aria-live="polite"></p>

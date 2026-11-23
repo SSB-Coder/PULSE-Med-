@@ -14,6 +14,12 @@ class MedicalHistory(BaseModel):
     notes: str = Field(default="", max_length=12000)
 
 
+class PhotoHistoryExtraction(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, str_strip_whitespace=True)
+    text: str = Field(min_length=1, max_length=12000)
+    history: MedicalHistory
+
+
 class ProfileUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     history: MedicalHistory

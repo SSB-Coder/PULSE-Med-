@@ -19,10 +19,19 @@ function setup() {
     get('history-form').elements = Object.fromEntries(
         ['conditions', 'medications', 'allergies', 'surgeries', 'family_history', 'notes'].map(k => [k, element()])
     );
+    const limits = { conditions: 3000, medications: 3000, allergies: 2000, surgeries: 2000, family_history: 2000, notes: 12000 };
+    for (const [field, limit] of Object.entries(limits)) get('history-form').elements[field].maxLength = limit;
+    const welcome = {kind: 'welcome-template-copy'};
+    get('welcome-template').content = {cloneNode: () => welcome};
+    function createElement() {
+        const node = element();
+        Object.defineProperty(node, 'id', {set(id) { elements.set(id, node); }});
+        return node;
+    }
     const calls = [];
     const context = vm.createContext({
         window: { PULSE_CONFIG: { API_URL: 'https://api.example' }, location: { origin: 'https://app.example', pathname: '/', href: 'https://app.example/' }, history: { replaceState() {} } },
-        document: { body: element(), getElementById: get, createElement: element, querySelector: () => get('send-btn'), addEventListener() {} },
+        document: { body: element(), getElementById: get, createElement, querySelector: () => get('send-btn'), addEventListener() {} },
         Headers, FormData, URLSearchParams, URL, Blob, setTimeout,
         fetch: async (url, options) => { calls.push({ url, options }); return { status: 200, ok: true, json: async () => ({}) }; }
     });
@@ -84,23 +93,29 @@ test('photo extraction requires consent and never saves unreviewed text', async 
     get('photo-consent').checked = true;
     context.fetch = async (url, options) => {
         calls.push({ url, options });
-        return { status: 200, ok: true, json: async () => ({ text: 'Medication: [unclear]', requires_review: true }) };
+        return { status: 200, ok: true, json: async () => ({ text: 'Medication: [unclear]', history: {medications: '[unclear]', family_history: 'Mother has asthma'}, requires_review: true }) };
     };
     await run('extractPhoto()');
     assert.equal(calls.length, 1);
     assert.equal(calls[0].url, 'https://api.example/history/extract');
-    assert.equal(get('extracted-text').value, 'Medication: [unclear]');
-    assert.equal(get('history-form').elements.notes.value, '');
-    get('extracted-text').value = 'Reviewed medication text';
-    run('addReviewedText()');
-    assert.equal(get('history-form').elements.notes.value, 'Reviewed medication text');
+    assert.equal(get('extracted-text').textContent, 'Medication: [unclear]');
+    const form = get('history-form').elements;
+    assert.equal(form.medications.value, '');
+    form.medications.value = 'Existing medication';
+    form.allergies.value = 'Penicillin: rash';
+    get('extracted-medications').value = 'Reviewed medication text';
+    run('applyReviewedFields()');
+    assert.equal(form.medications.value, 'Existing medication\n\nReviewed medication text');
+    assert.equal(form.family_history.value, 'Mother has asthma');
+    assert.equal(form.allergies.value, 'Penicillin: rash');
+    assert.equal(form.notes.value, '');
     assert.equal(calls.length, 1, 'Reviewing text still must not persist it');
     get('record-name').value = 'Reviewed report';
     await run('saveHistory({preventDefault(){}})');
     assert.equal(calls.length, 2);
     assert.equal(calls[1].options.method, 'POST');
     assert.equal(calls[1].url, 'https://api.example/medical-records');
-    assert.equal(JSON.parse(calls[1].options.body).history.notes, 'Reviewed medication text');
+    assert.equal(JSON.parse(calls[1].options.body).history.medications, 'Existing medication\n\nReviewed medication text');
 });
 
 test('late photo response cannot expose text after account change', async () => {
@@ -113,7 +128,7 @@ test('late photo response cannot expose text after account change', async () => 
     run('applySession(null)');
     request.resolve({ status: 200, ok: true, json: async () => ({ text: 'private transcription' }) });
     await extracting;
-    assert.equal(get('extracted-text').value, '');
+    assert.equal(get('extracted-text').textContent, '');
     assert.equal(get('extraction-review').hidden, true);
 });
 
@@ -385,8 +400,9 @@ test('multiple records save independently; reviewed text is kept in its named re
     await run('saveHistory({preventDefault(){}})');
     run('beginMedicalRecord()');
     get('record-name').value = 'November report';
-    get('extracted-text').value = 'Reviewed report text';
-    run('addReviewedText()');
+    get('extraction-review').hidden = false;
+    get('extracted-notes').value = 'Reviewed report text';
+    run('applyReviewedFields()');
     await run('saveHistory({preventDefault(){}})');
     assert.equal(saved.length, 2);
     assert.equal(saved[0].history.conditions, 'Hypertension');
@@ -497,4 +513,27 @@ test('conflicting saves can be kept as a separate chat without overwriting the r
     assert.equal(await run('saveConversationCopy()'),true);
     assert.equal(run('currentConversationId'),'copy');
     assert.equal(run('chatHistory[0].content'),'Local changes');
+});
+
+
+test('an overlong merged field leaves every form field unchanged until corrected', () => {
+    const {get, run} = setup();
+    const form = get('history-form').elements;
+    form.allergies.value = 'a'.repeat(form.allergies.maxLength);
+    get('extraction-review').hidden = false;
+    get('extracted-conditions').value = 'Asthma';
+    get('extracted-allergies').value = 'Latex';
+    run('applyReviewedFields()');
+    assert.equal(form.conditions.value, '');
+    assert.equal(form.allergies.value.length, form.allergies.maxLength);
+    assert.match(get('history-status').textContent, /Shorten.*allergies/);
+    assert.equal(get('extraction-review').hidden, false);
+});
+
+test('reset uses the same welcome template as the initial screen', () => {
+    const {get, run} = setup();
+    run('renderWelcome()');
+    const initial = get('chat-box').children[0];
+    run('resetChat()');
+    assert.equal(get('chat-box').children[0], initial);
 });

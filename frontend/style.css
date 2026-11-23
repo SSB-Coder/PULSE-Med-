@@ -595,3 +595,11 @@ dialog textarea { resize: vertical; min-height: 70px; }
 .conversation-list { max-height: min(36dvh, 360px); overflow-y: auto; }
 .topbar-title { min-width: 0; }
 .history-context-help { display: block; font-size: .73rem; line-height: 1.5; }
+
+.extracted-transcription {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 16rem;
+    overflow-y: auto;
+    font: inherit;
+}

@@ -1,6 +1,11 @@
 const config = window.PULSE_CONFIG || {};
 const API_URL = (config.API_URL || window.location.origin).replace(/\/$/, '');
 const HISTORY_FIELDS = ['conditions', 'medications', 'allergies', 'surgeries', 'family_history', 'notes'];
+const HISTORY_FIELD_LABELS = {
+    conditions: 'Conditions', medications: 'Current medications', allergies: 'Allergies',
+    surgeries: 'Surgeries / hospital stays', family_history: 'Relevant family history', notes: 'Additional notes'
+};
+const extractedField = (field) => 'extracted-' + field;
 let chatHistory = [];
 let isLoading = false;
 let session = null;
@@ -92,7 +97,9 @@ function clearExtraction(preserveInputId = null) {
     selectedPhoto = null;
     ['history-photo', 'history-camera'].forEach((id) => { if (id !== preserveInputId) $(id).value = ''; });
     $('photo-consent').checked = false;
-    $('extracted-text').value = '';
+    $('extracted-text').textContent = '';
+    $('extracted-fields').replaceChildren();
+    $('transcription-details').open = false;
     $('extraction-review').hidden = true;
     $('extract-btn').disabled = false;
 }
@@ -723,6 +730,7 @@ async function deleteHistory() {
 }
 
 async function extractPhoto() {
+    if ($('extract-btn').disabled) return;
     if (!selectedPhoto) { $('history-status').textContent = 'Choose or take a photo first.'; return; }
     if (!$('photo-consent').checked) { $('history-status').textContent = 'Please agree to send the photo to Groq before extracting text.'; return; }
     if (selectedPhoto.size > 5 * 1024 * 1024) { $('history-status').textContent = 'Choose a photo no larger than 5 MB.'; return; }
@@ -732,29 +740,58 @@ async function extractPhoto() {
     body.append('image', selectedPhoto);
     body.append('consent', 'true');
     $('extract-btn').disabled = true;
-    $('history-status').textContent = 'Extracting text. You will review it before saving.';
+    $('extraction-review').hidden = true;
+    $('extracted-fields').replaceChildren();
+    $('transcription-details').open = false;
+    $('extracted-text').textContent = '';
+    $('history-status').textContent = 'Reading the document and organizing suggested fields…';
     try {
         const data = await api('/history/extract', { method: 'POST', body });
         if (epoch !== accountEpoch || extraction !== extractionEpoch) return;
-        $('extracted-text').value = data.text;
+        if (!data.history) throw new Error('This server does not support organized photo extraction yet.');
+        $('extracted-text').textContent = data.text;
+        for (const field of HISTORY_FIELDS) {
+            const label = document.createElement('label');
+            label.textContent = HISTORY_FIELD_LABELS[field];
+            const input = document.createElement('textarea');
+            input.id = extractedField(field);
+            input.rows = 2;
+            input.maxLength = $('history-form').elements[field].maxLength;
+            input.value = data.history[field] || '';
+            label.appendChild(input);
+            $('extracted-fields').appendChild(label);
+        }
         $('extraction-review').hidden = false;
-        $('history-status').textContent = 'Review the transcription below. It has not been saved.';
-        $('extracted-text').focus();
+        $('history-status').textContent = 'Review the suggested fields below before applying them.';
+        $(extractedField(HISTORY_FIELDS[0])).focus();
     } catch (error) {
         if (epoch === accountEpoch && extraction === extractionEpoch) $('history-status').textContent = error.message;
     } finally { if (extraction === extractionEpoch) $('extract-btn').disabled = false; }
 }
 
-function addReviewedText() {
-    const text = $('extracted-text').value.trim();
-    if (!text) { $('history-status').textContent = 'Enter or correct the transcription first.'; return; }
-    const notes = $('history-form').elements.notes;
-    const combined = [notes.value.trim(), text].filter(Boolean).join('\n\n');
-    if (combined.length > 12000) { $('history-status').textContent = 'Notes are limited to 12,000 characters. Shorten the text before adding it.'; return; }
-    notes.value = combined;
+function applyReviewedFields() {
+    if ($('extraction-review').hidden) return;
+    const updates = [];
+    for (const field of HISTORY_FIELDS) {
+        const value = $(extractedField(field)).value.trim();
+        if (!value) continue;
+        const input = $('history-form').elements[field];
+        const existing = input.value;
+        if (existing.split(/\n{2,}/).some((entry) => entry.trim() === value)) continue;
+        const combined = existing.trim() ? existing + '\n\n' + value : value;
+        if (combined.length > input.maxLength) {
+            $('history-status').textContent = `Shorten the suggested ${HISTORY_FIELD_LABELS[field].toLowerCase()} to fit the form.`;
+            $(extractedField(field)).focus();
+            return;
+        }
+        updates.push([input, combined]);
+    }
+    for (const [input, value] of updates) input.value = value;
     clearExtraction();
-    $('history-status').textContent = 'Reviewed text added to notes. Select Save history to store it.';
-    notes.focus();
+    $('history-status').textContent = updates.length
+        ? 'Reviewed entries added. Select Save history to store them.'
+        : 'No new entries to add.';
+    (updates[0]?.[0] || $('extract-btn')).focus();
 }
 
 function doctorCard(doctor) {
@@ -816,13 +853,11 @@ function resetChat() {
     setSendState(false);
     updateChatContext();
     renderRecordChoices(); renderConversationList();
-    $('chat-box').innerHTML = `<div class="welcome-screen" id="welcome-screen">
-        <div class="welcome-icon">🩺</div><h2>Welcome to PULSE</h2>
-        <p>Tell us your current symptoms and how long they have lasted. PULSE will explain what it can and show matching doctor profiles. You choose whether to include saved medical history.</p>
-        <div class="suggestion-chips">
-        <button class="chip" onclick="fillInput(this)">I have recurring headaches. Who could I consult?</button>
-        <button class="chip" onclick="fillInput(this)">Find a doctor for migraines</button>
-        </div></div>`;
+    renderWelcome();
+}
+
+function renderWelcome() {
+    $('chat-box').replaceChildren($('welcome-template').content.cloneNode(true));
 }
 
 function toggleSidebar() { $('sidebar').classList.toggle('hidden'); }
@@ -904,6 +939,7 @@ function setSendState(loading) {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    renderWelcome();
     setEntryScreen(true);
     $('guest-btn').addEventListener('click', continueAsGuest);
     $('auth-dialog').addEventListener('cancel', (event) => {
@@ -925,7 +961,12 @@ document.addEventListener('DOMContentLoaded', () => {
     $('cancel-delete-btn').addEventListener('click', () => { $('delete-confirm').hidden = true; });
     $('confirm-delete-btn').addEventListener('click', deleteHistory);
     $('extract-btn').addEventListener('click', extractPhoto);
-    $('add-extracted-btn').addEventListener('click', addReviewedText);
+    $('add-extracted-btn').addEventListener('click', applyReviewedFields);
+    $('discard-extracted-btn').addEventListener('click', () => {
+        clearExtraction();
+        $('history-status').textContent = 'Suggestions discarded.';
+        $('history-photo').focus();
+    });
     $('history-dialog').addEventListener('close', clearExtraction);
     ['history-photo', 'history-camera'].forEach((id) => $(id).addEventListener('change', (event) => {
         const photo = event.target.files[0];

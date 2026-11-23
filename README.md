@@ -30,7 +30,7 @@ cloud accounts, database migration, credentials, and deployment still require se
 - **Account isolation:** FastAPI verifies the caller's token through Supabase Auth, and database
   requests use that same token so row-level security applies. No service-role key is required.
 - **Optional document photo transcription:** camera/file input → Groq vision model → editable
-  text preview → add reviewed text to notes → explicit save. PULSE does not persist original images.
+  field suggestions and transcription preview → apply reviewed fields → explicit save. PULSE does not persist original images.
 - **Fictional doctors:** 20 JSON profiles, including resume text, with topic, city, specialty,
   and fee filters. Chat proactively matches current symptoms, earlier user messages, and saved history when explicitly enabled. Current-message matches take priority, and cards explain which context matched. Matching is based on catalog keywords; the model explains the supplied profiles.
   These invented profiles cannot be booked and are not clinical referrals.
