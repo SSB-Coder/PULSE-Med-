@@ -40,25 +40,19 @@
                 <p id="account-status" class="small-text" role="status">Checking sign-in configuration…</p>
                 <button id="login-btn" class="sidebar-action-btn" type="button">Log in / Create account</button>
                 <button id="history-btn" class="sidebar-action-btn" type="button" hidden>Medical history</button>
-                <label id="record-select-label" class="small-text" hidden>Main medical history for this chat
+                <label id="record-select-label" class="small-text" hidden>Medical History
                     <select id="chat-record-select"><option value="">No record selected</option></select>
-                    <span class="history-context-help">Changing the record affects future replies. Earlier messages stay in this chat.</span>
+                    <span class="history-context-help"></span>
                 </label>
                 <label id="history-toggle-label" class="small-text" hidden>
-                    <input id="use-history" type="checkbox"> Use saved history for replies and doctor matches (shares it with Groq)
+                    <input id="use-history" type="checkbox"> Use saved history
                 </label>
                 <button id="logout-btn" class="sidebar-action-btn" type="button" hidden>Sign out</button>
                 <button id="doctors-btn" class="sidebar-action-btn" type="button">Explore doctors</button>
             </div>
-            <div class="sidebar-section">
-                <p class="sidebar-label">About</p>
-                <div class="sidebar-info">
-                    <p>Pulse is an AI medical assistant powered by evidence-based knowledge. Always consult a licensed physician for personal medical decisions.</p>
-                </div>
-            </div>
-
+            
             <div class="sidebar-footer">
-                <span>Qwen · Pinecone · Supabase</span>
+                <span></span>
             </div>
         </aside>
 
@@ -80,7 +74,7 @@
                 <div class="welcome-screen" id="welcome-screen">
                     <div class="welcome-icon">🩺</div>
                     <h2>Welcome to PULSE</h2>
-                    <p>Tell us what is bothering you today. PULSE can explain health topics and suggest doctor profiles based on your symptoms and the history you choose to share.</p>
+                    <p>Tell us what is bothering you today.</p>
                     <div class="suggestion-chips">
                         <button class="chip" onclick="fillInput(this)">What are symptoms of diabetes?</button>
                         <button class="chip" onclick="fillInput(this)">How does ibuprofen work?</button>
