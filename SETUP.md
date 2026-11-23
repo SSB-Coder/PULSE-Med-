@@ -167,12 +167,21 @@ Pinecone secrets and add the following. `.env.example` documents every variable.
 | `SUPABASE_PUBLISHABLE_KEY` | Your project's publishable key |
 | `ALLOWED_ORIGINS` | Your exact frontend origin, e.g. `https://pulse-med.vercel.app` |
 | `PINECONE_INDEX` | Optional; defaults to `pulse-medical-db` |
-| `AI_MODEL` | `qwen/qwen3.8-27b`; shared by chat and photo transcription |
+| `AI_MODEL` | `qwen/qwen3.8-27b`; shared by chat, photo transcription, and PubMed summaries |
 | `PHOTO_EXTRACTION_ENABLED` | Optional; defaults to `true`. Set `false` to disable photos. |
+| `PUBMED_CONTACT_EMAIL` | Optional maintainer email for NCBI E-utilities requests |
 
 `ALLOWED_ORIGINS` is comma-separated, with no trailing slash on each origin. Include
 `http://localhost:5500` and `http://127.0.0.1:5500` only if you want local frontend testing
 against that backend. The existing MiniLM embeddings and Pinecone collection are unchanged.
+
+**PubMed search** needs no additional API key, Pinecone index, or Supabase migration.
+The backend sends only the topic entered in the research dialog, spaces outbound requests
+and caches recent abstract results in memory. Run this feature on a single worker; multiple
+workers or replicas that share an outbound IP would need a shared limiter. The summary uses
+the existing Groq model. Search for `type 2 diabetes exercise systematic review` as a guest
+to check the deployed feature, then open a numbered citation and check that it links to a
+listed paper. PubMed searches and summaries are separate from saved conversations.
 
 ## 5. Confirm shared Qwen model access
 

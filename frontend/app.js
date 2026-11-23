@@ -38,6 +38,7 @@ let chatDirty = false;
 let chatMutation = 0;
 let guestChatCounter = 0;
 let pendingDeleteChatId = null;
+let pubmedRequest = null;
 const $ = (id) => document.getElementById(id);
 
 function updateChatContext() {
@@ -71,9 +72,9 @@ function continueAsGuest() {
     $('user-input').focus();
 }
 
-async function api(path, options = {}) {
+async function api(path, options = {}, authenticated = true) {
     const headers = new Headers(options.headers || {});
-    if (session) headers.set('Authorization', `Bearer ${session.access_token}`);
+    if (authenticated && session) headers.set('Authorization', `Bearer ${session.access_token}`);
     const response = await fetch(API_URL + path, { ...options, headers, cache: 'no-store' });
     if (response.status === 204) return null;
     const data = await response.json().catch(() => ({}));
@@ -835,6 +836,7 @@ async function findDoctors(event) {
 function fillInput(btn) { $('user-input').value = btn.innerText; $('user-input').focus(); }
 
 function resetChat() {
+    closePubMed();
     chatEpoch++;
     conversationOpenEpoch++;
     conversationOpening = false;
@@ -861,6 +863,97 @@ function renderWelcome() {
 }
 
 function toggleSidebar() { $('sidebar').classList.toggle('hidden'); }
+
+function clearPubMed() {
+    pubmedRequest?.abort();
+    pubmedRequest = null;
+    $('pubmed-query').value = '';
+    $('pubmed-status').textContent = '';
+    $('pubmed-results').replaceChildren();
+    $('pubmed-submit').disabled = false;
+}
+
+function closePubMed() {
+    if ($('pubmed-dialog').open) $('pubmed-dialog').close();
+    clearPubMed();
+}
+
+function pubmedLink(source, label) {
+    const link = document.createElement('a');
+    link.href = `https://pubmed.ncbi.nlm.nih.gov/${source.pmid}/`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = label;
+    return link;
+}
+
+function renderPubMed(data) {
+    const results = $('pubmed-results');
+    const sources = (data.sources || []).filter((source) => /^[0-9]+$/.test(source.pmid));
+    const titles = {
+        summarized: 'AI summary based on abstracts. Findings may not apply to an individual case.',
+        insufficient: 'The abstracts did not provide enough relevant evidence to summarize this topic.',
+        no_abstracts: 'PubMed found papers, but none included an abstract for the summary.',
+        no_results: 'No PubMed results found. Try a broader research topic.',
+        summary_unavailable: 'The AI summary is unavailable. You can still open the PubMed results below.'
+    };
+    $('pubmed-status').textContent = titles[data.status] || 'PubMed search complete.';
+    if (data.findings?.length) {
+        const findings = document.createElement('ul');
+        data.findings.forEach((finding) => {
+            const item = document.createElement('li');
+            item.textContent = finding.text;
+            sources.forEach((source, index) => {
+                if (finding.pmids.includes(source.pmid)) {
+                    item.append(' ', pubmedLink(source, `[${index + 1}]`));
+                }
+            });
+            findings.appendChild(item);
+        });
+        results.appendChild(findings);
+    }
+    if (sources.length) {
+        const heading = document.createElement('h3');
+        heading.textContent = 'PubMed sources';
+        const list = document.createElement('ol');
+        sources.forEach((source) => {
+            const item = document.createElement('li');
+            item.appendChild(pubmedLink(source, source.title));
+            if (source.year) item.append(` (${source.year})`);
+            list.appendChild(item);
+        });
+        results.append(heading, list);
+    }
+}
+
+async function submitPubMed(event) {
+    event.preventDefault();
+    if (pubmedRequest) return;
+    const query = $('pubmed-query').value.trim();
+    if (query.length < 3) {
+        $('pubmed-status').textContent = 'Enter at least three characters.';
+        return;
+    }
+    const request = new AbortController();
+    pubmedRequest = request;
+    $('pubmed-submit').disabled = true;
+    $('pubmed-status').textContent = 'Searching PubMed and checking abstracts…';
+    $('pubmed-results').replaceChildren();
+    try {
+        const data = await api('/research/pubmed', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query }), signal: request.signal, credentials: 'omit'
+        }, false);
+        if (pubmedRequest === request) renderPubMed(data);
+    } catch (error) {
+        if (pubmedRequest === request) $('pubmed-status').textContent = error.message || 'PubMed search failed.';
+    } finally {
+        if (pubmedRequest === request) {
+            pubmedRequest = null;
+            $('pubmed-submit').disabled = false;
+        }
+    }
+}
 
 async function sendbtn() {
     if (isLoading || conversationOpening) return;
@@ -988,6 +1081,9 @@ document.addEventListener('DOMContentLoaded', () => {
     $('new-record-btn').addEventListener('click', beginMedicalRecord);
     $('more-chats-btn').addEventListener('click', () => void loadConversations(true));
     $('retry-chat-save').addEventListener('click', () => void saveCurrentConversation());
+    $('pubmed-btn').addEventListener('click', () => { showDialog('pubmed-dialog'); $('pubmed-query').focus(); });
+    $('pubmed-dialog').addEventListener('close', () => { if (!$('pubmed-dialog').open) clearPubMed(); });
+    $('pubmed-form').addEventListener('submit', submitPubMed);
     $('save-chat-copy').addEventListener('click', () => void saveConversationCopy());
     $('confirm-delete-chat').addEventListener('click', deleteConversation);
     $('user-input').addEventListener('input', () => $('user-input').setCustomValidity(''));

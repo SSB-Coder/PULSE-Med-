@@ -96,11 +96,28 @@
                         </svg>
                     </button>
                 </div>
+                <button id="pubmed-btn" class="pubmed-button" type="button" aria-haspopup="dialog">Search PubMed</button>
                 <p class="input-disclaimer">AI responses are for informational purposes only. Not a substitute for professional medical advice.</p>
             </div>
         </main>
 
     </div>
+    <dialog id="pubmed-dialog" aria-labelledby="pubmed-title">
+        <div class="dialog-heading">
+            <h2 id="pubmed-title">Search PubMed</h2>
+            <button type="button" data-close="pubmed-dialog" aria-label="Close PubMed search">✕</button>
+        </div>
+        <form id="pubmed-form">
+            <label for="pubmed-query">Research topic</label>
+            <input id="pubmed-query" name="query" type="search" required minlength="3" maxlength="200"
+                   autocomplete="off" placeholder="e.g. type 2 diabetes exercise systematic review"
+                   aria-describedby="pubmed-help">
+            <p id="pubmed-help" class="small-text">Use general terms and leave out names or personal details. PULSE sends this search to PubMed without your chat or saved history. For urgent symptoms, seek local emergency care.</p>
+            <button id="pubmed-submit" type="submit" class="primary-button">Search</button>
+        </form>
+        <p id="pubmed-status" class="small-text" role="status"></p>
+        <div id="pubmed-results"></div>
+    </dialog>
     <dialog id="auth-dialog" aria-labelledby="auth-title">
         <div class="auth-layout">
         <section class="auth-intro" aria-label="About PULSE">

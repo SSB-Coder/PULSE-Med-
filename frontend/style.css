@@ -435,6 +435,25 @@ body {
 .send-btn:hover { background: var(--blue-700); transform: scale(1.05); }
 .send-btn:active { transform: scale(.95); }
 
+.pubmed-button {
+    margin-top: 8px;
+    padding: 5px 10px;
+    border: 1px solid var(--slate-200);
+    border-radius: 8px;
+    background: var(--white);
+    color: var(--blue-700);
+    font: inherit;
+    font-size: .8rem;
+    cursor: pointer;
+}
+.pubmed-button:hover { border-color: var(--blue-600); }
+#pubmed-form { display: grid; gap: 8px; }
+#pubmed-form .primary-button { justify-self: start; }
+#pubmed-status { margin-top: 12px; }
+#pubmed-results { overflow-wrap: anywhere; }
+#pubmed-results ul, #pubmed-results ol { padding-left: 1.5rem; }
+#pubmed-results li { margin: .45rem 0; }
+
 .input-disclaimer {
     margin-top: 8px;
     font-size: 0.72rem;

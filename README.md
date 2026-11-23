@@ -22,6 +22,7 @@ cloud accounts, database migration, credentials, and deployment still require se
 ## Features
 
 - **Reference-based chat:** retrieve medical passages from the existing Pinecone index.
+- **PubMed research:** use **Search PubMed** beside the chat input to look up a general research topic. PULSE finds up to five papers and uses their abstracts for a short summary with direct PubMed citations. The search is separate from chat and works for guests.
 - **Account entry:** a full-page login/create-account screen with a Continue as guest option. Existing sessions open the app directly; signing out returns to login.
 - **Email/password login:** registration, login, email confirmation, and password reset through
   Supabase Auth. Supabase stores salted bcrypt hashes; PULSE never persists raw passwords.

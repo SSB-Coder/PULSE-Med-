@@ -32,7 +32,7 @@ function setup() {
     const context = vm.createContext({
         window: { PULSE_CONFIG: { API_URL: 'https://api.example' }, location: { origin: 'https://app.example', pathname: '/', href: 'https://app.example/' }, history: { replaceState() {} } },
         document: { body: element(), getElementById: get, createElement, querySelector: () => get('send-btn'), addEventListener() {} },
-        Headers, FormData, URLSearchParams, URL, Blob, setTimeout,
+        Headers, FormData, URLSearchParams, URL, Blob, AbortController, setTimeout,
         fetch: async (url, options) => { calls.push({ url, options }); return { status: 200, ok: true, json: async () => ({}) }; }
     });
     vm.runInContext(fs.readFileSync('frontend/app.js', 'utf8'), context);
@@ -45,6 +45,45 @@ function deferred() {
     return { promise, resolve };
 }
 
+test('PubMed sends only the explicit topic and links citations to PubMed', async () => {
+    const { context, get, calls, run } = setup();
+    run("session = {access_token:'private-token'}; chatHistory = [{role:'user', content:'private symptoms'}]");
+    get('user-input').value = 'private draft';
+    get('pubmed-query').value = ' diabetes exercise ';
+    context.fetch = async (url, options) => {
+        calls.push({url, options});
+        return { status: 200, ok: true, json: async () => ({
+            status: 'summarized', findings: [{text: 'One finding.', pmids: ['42']}],
+            sources: [{pmid: '42', title: 'One paper', year: '2024'}]
+        }) };
+    };
+    await run('submitPubMed({preventDefault(){}})');
+    assert.equal(calls[0].url, 'https://api.example/research/pubmed');
+    assert.deepEqual(JSON.parse(calls[0].options.body), {query: 'diabetes exercise'});
+    assert.equal(calls[0].options.headers.has('Authorization'), false);
+    const [findings, , sources] = get('pubmed-results').children;
+    assert.equal(findings.children[0].children[1].href, 'https://pubmed.ncbi.nlm.nih.gov/42/');
+    assert.equal(sources.children[0].children[0].textContent, 'One paper');
+    assert.equal(run('chatHistory.length'), 1);
+    assert.equal(get('user-input').value, 'private draft');
+});
+
+test('closing PubMed clears results and ignores a late reply', async () => {
+    const { context, get, run } = setup();
+    const pending = deferred();
+    let signal;
+    context.fetch = (_url, options) => { signal = options.signal; return pending.promise; };
+    get('pubmed-query').value = 'diabetes exercise';
+    const searching = run('submitPubMed({preventDefault(){}})');
+    run('closePubMed()');
+    assert.equal(signal.aborted, true);
+    pending.resolve({status: 200, ok: true, json: async () => ({
+        status: 'summary_unavailable', sources: [{pmid: '42', title: 'Late result'}]
+    })});
+    await searching;
+    assert.equal(get('pubmed-status').textContent, '');
+    assert.deepEqual(get('pubmed-results').children, []);
+});
 
 test('assistant markdown goes through sanitization; user text uses textContent', () => {
     const { context, get, run } = setup();

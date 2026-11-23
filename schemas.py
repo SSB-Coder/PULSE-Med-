@@ -37,6 +37,22 @@ class ChatRequest(BaseModel):
     medical_record_id: UUID | None = None
 
 
+class PubMedSearch(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    query: str = Field(min_length=3, max_length=200)
+
+
+class PubMedFinding(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    text: str = Field(min_length=1, max_length=1000)
+    pmids: list[str] = Field(min_length=1, max_length=5)
+
+
+class PubMedSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    findings: list[PubMedFinding] = Field(max_length=4)
+
+
 class MedicalRecordInput(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     name: str = Field(min_length=1, max_length=100)
